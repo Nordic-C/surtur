@@ -1,0 +1,7 @@
+[package]
+name = "surtur"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rslua = "0.3.0"
