@@ -1,4 +1,4 @@
-local dependencies = {
+deps = {
     "test",
     "port"
 }
