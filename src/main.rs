@@ -1,4 +1,9 @@
-use std::{fs::{File, self}, io::Read, process::Command, env};
+use std::{
+    env,
+    fs::{self, File},
+    io::Read,
+    process::Command,
+};
 
 use rlua::{Lua, Result, Table};
 
@@ -9,8 +14,6 @@ fn main() {
 
     let result = eval_lua();
 
-    result;
-
     // TODO: implement error handling
     if args.get(1).unwrap() == "run" {
         run_c();
@@ -19,7 +22,7 @@ fn main() {
 
 fn run_c() {
     build_c();
-    let command = "./build/main.exe";
+    let command = "./example/build/main.exe";
 
     let mut child = Command::new(command);
 
@@ -28,9 +31,15 @@ fn run_c() {
     match result {
         Ok(output) => {
             if output.status.success() {
-                println!("Command output:\n{}", String::from_utf8_lossy(&output.stdout));
+                println!(
+                    "Command output:\n{}",
+                    String::from_utf8_lossy(&output.stdout)
+                );
             } else {
-                eprintln!("Command failed with error: {}", String::from_utf8_lossy(&output.stderr));
+                eprintln!(
+                    "Command failed with error: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
             }
         }
         Err(err) => {
@@ -42,11 +51,13 @@ fn run_c() {
 fn build_c() {
     let cmd = "gcc";
 
+    let build_path = "C:/Users/Admin/programming/rust/surtur/example/build";
+
     let mut binding = Command::new(cmd);
     let output = binding
         .arg("C:/Users/Admin/programming/rust/surtur/example/src/main.c")
         .arg("-o")
-        .arg("C:/Users/Admin/programming/rust/surtur/build/main.exe");
+        .arg(format!("{}/main.exe", build_path));
 
     match output.status() {
         Ok(_) => println!("sucess"),
