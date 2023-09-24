@@ -4,11 +4,11 @@ Interacts with config module to
 gather/store configuration.
 */
 
-use std::{env::{self, args}, process::Command};
+use std::{env, process::Command};
 
 use maplit::hashmap;
 
-use crate::{builder::Builder, creator::Project};
+use crate::{builder::{Builder, CompType}, creator::Project};
 
 const INTRO: &str =
 r#"
@@ -44,7 +44,21 @@ pub fn execute() {
     match first_arg {
         Some(arg) => match arg.as_str() {
             "run" => run_c(),
-            "build" => build_c(),
+            "build" => {
+                let comp_type = match second_arg {
+                    Some(arg) => match arg.as_str() {
+                        "-exe" => CompType::EXE,
+                        "-asm" => CompType::ASM,
+                        "-obj" => CompType::OBJ,
+                        "-e" => CompType::EXE,
+                        "-a" => CompType::ASM,
+                        "-o" => CompType::OBJ,
+                        _ => panic!("Invalid argument"),
+                    },
+                    None => CompType::EXE,
+                };
+                build_c(comp_type);
+            },
             "new" => create_proj(match second_arg {
                 Some(arg) => arg,
                 None => panic!("Missing second arg"),
@@ -67,7 +81,7 @@ pub fn execute() {
 }
 
 fn run_c() {
-    build_c();
+    build_c(CompType::EXE);
     let command = "./example/build/main.exe";
 
     let mut cmd = Command::new(command);
@@ -94,9 +108,12 @@ fn run_c() {
     }
 }
 
-fn build_c() {
-    let mut builder = Builder::new();
-    builder.build().expect("Failed to build project");
+fn build_c(comp_type: CompType) {
+    let cur_dir = env::current_dir().expect("Failed to get current directory");
+    let cur_dir_str = cur_dir.to_str().unwrap();
+    println!("{}", cur_dir_str);
+    let mut builder = Builder::new(cur_dir_str);
+    builder.build(comp_type).expect("Failed to build project");
 }
 
 fn create_proj(name: &str) {
