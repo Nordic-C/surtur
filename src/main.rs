@@ -1,17 +1,12 @@
-use std::{
-    env,
-    fs::{self, File},
-    io::{Read, Error},
-    process::{Command, Output},
-};
+use std::{fs::File, io::Read};
 
-use builder::Builder;
 use cli::execute;
 use rlua::{Lua, Table};
 
+mod builder;
 mod cli;
 mod config;
-mod builder;
+mod creator;
 
 fn main() {
     execute();

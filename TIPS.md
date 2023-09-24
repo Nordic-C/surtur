@@ -15,3 +15,9 @@ This is for tips when using the cli
 
 - `execute`
   - use `run` instead
+
+- `create`
+  - use `new` instead
+
+- `package`
+  - use `bundle` instead
