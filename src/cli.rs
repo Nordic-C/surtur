@@ -8,7 +8,7 @@ use std::{env, process::Command};
 
 use maplit::hashmap;
 
-use crate::{builder::{Builder, CompType}, creator::Project};
+use crate::{builder::{Builder, CompType, Standard}, creator::Project};
 
 const INTRO: &str =
 r#"
@@ -26,14 +26,14 @@ The most important commands are:
 "#;
 
 pub fn execute() {
-    let cmd_tips = hashmap!(
+    let cmd_tips = hashmap! {
         "uninstall" => "remove",
         "install" => "add",
         "compile" => "build",
         "execute" => "run",
         "create" => "new",
         "package" => "bundle"
-    );
+    };
     let args: Vec<String> = env::args().collect();
 
     let first_arg = args.get(1);
@@ -43,7 +43,8 @@ pub fn execute() {
     
     match first_arg {
         Some(arg) => match arg.as_str() {
-            "run" => run_c(),
+            // TODO: determine standard depending on config file
+            "run" => run_c(Standard::C17),
             "build" => {
                 let comp_type = match second_arg {
                     Some(arg) => match arg.as_str() {
@@ -52,13 +53,16 @@ pub fn execute() {
                         "-obj" => CompType::OBJ,
                         "-e" => CompType::EXE,
                         "-a" => CompType::ASM,
+                        "-s" => CompType::ASM,
                         "-o" => CompType::OBJ,
                         _ => panic!("Invalid argument"),
                     },
                     None => CompType::EXE,
                 };
-                build_c(comp_type);
+                // TODO: determine standard depending on config file
+                build_c(comp_type, Standard::C17);
             },
+            // TODO: Create git repo
             "new" => create_proj(match second_arg {
                 Some(arg) => arg,
                 None => panic!("Missing second arg"),
@@ -80,8 +84,8 @@ pub fn execute() {
     }
 }
 
-fn run_c() {
-    build_c(CompType::EXE);
+fn run_c(std: Standard) {
+    build_c(CompType::EXE, std);
     let command = "./example/build/main.exe";
 
     let mut cmd = Command::new(command);
@@ -108,12 +112,12 @@ fn run_c() {
     }
 }
 
-fn build_c(comp_type: CompType) {
+fn build_c(comp_type: CompType, std: Standard) {
     let cur_dir = env::current_dir().expect("Failed to get current directory");
     let cur_dir_str = cur_dir.to_str().unwrap();
     println!("{}", cur_dir_str);
     let mut builder = Builder::new(cur_dir_str);
-    builder.build(comp_type).expect("Failed to build project");
+    builder.build(comp_type, std).expect("Failed to build project");
 }
 
 fn create_proj(name: &str) {
