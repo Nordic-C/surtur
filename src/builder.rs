@@ -33,7 +33,7 @@ pub struct Builder {
     source: String,
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub enum Standard {
     C89,
     C99,
@@ -95,7 +95,7 @@ impl Builder {
         Ok(output)
     }
 
-    fn get_standards() -> HashMap<Standard, String> {
+    pub fn get_standards() -> HashMap<Standard, String> {
         let standards = hashmap! {
             Standard::C89 => String::from("c89"),
             Standard::C99 => String::from("c99"),

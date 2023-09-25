@@ -23,6 +23,7 @@ impl Project {
     pub fn create(&self) {
         fs::create_dir(format!("{}", self.root_name)).expect("Failed to create root dir");
         fs::create_dir(format!("{}/src", self.root_name)).expect("Failed to create src dir");
+        fs::create_dir(format!("{}/build", self.root_name)).expect("Failed to create build dir");
         let mut config_file = File::create(format!("{}/project.lua", self.root_name)).expect("Faile to create project config file");
         config_file.write_all(Self::get_cfg_file_layout(&self.root_name).as_bytes()).expect("Failed to write to file");
         let mut main_file = File::create(format!("{}/src/main.c", self.root_name)).expect("Faile to create project config file");
@@ -32,13 +33,16 @@ impl Project {
     fn get_cfg_file_layout(name: &str) -> String {
         let layout = format!(
         r#"-- versioning
-        Versions = {{}}
-        Versions["c"] = 0.1
-        Versions["project"] = 0.1
-        Name = "{}"
+Name = "{}"
+Versions = {{
+    ["c"] = "c17",
+    ["proj"] = "0.1"
+}}
         
-        -- external dependents
-        Dependencies = {{}}
+-- external dependents
+Dependencies = {{
+
+}}
         "#
         , name);
         layout

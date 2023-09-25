@@ -4,14 +4,17 @@ Interacts with config module to
 gather/store configuration.
 */
 
-use std::{env, process::Command};
+use std::{env, fs::File, process::Command};
 
 use maplit::hashmap;
 
-use crate::{builder::{Builder, CompType, Standard}, creator::Project, config::ConfigFile};
+use crate::{
+    builder::{Builder, CompType, Standard},
+    config::ConfigFile,
+    creator::Project, util,
+};
 
-const INTRO: &str =
-r#"
+const INTRO: &str = r#"
 This is the Surtur build tool for C
 
 The most important commands are:
@@ -35,7 +38,16 @@ pub fn execute() {
         "package" => "bundle"
     };
     let cur_dir = env::current_dir().expect("Failed to get current directory");
-    let config = ConfigFile::from(format!("{}/project.lua", cur_dir.to_str().expect("failed to get current directory")).as_str());
+
+    let path = format!(
+        "{}/project.lua",
+        cur_dir.to_str().expect("failed to get current directory"),
+    );
+
+    let mut file = match File::open(&path) {
+        Ok(file) => Some(file),
+        Err(_) => None,
+    };
 
     let args: Vec<String> = env::args().collect();
 
@@ -43,12 +55,22 @@ pub fn execute() {
     let second_arg = args.get(2);
 
     let mut matched = false;
-    
+
     match first_arg {
         Some(arg) => match arg.as_str() {
-            // TODO: determine standard depending on config file
-            "run" => run_c(Standard::C17),
+            // TODO: Create git repo
+            "new" => {
+                create_proj(match second_arg {
+                    Some(arg) => arg,
+                    None => panic!("Missing second arg"),
+                });
+            }
+            "run" => {
+                let config = ConfigFile::from(&mut file.unwrap());
+                run_c(config.c_std);
+            }
             "build" => {
+                let config = ConfigFile::from(&mut file.unwrap());
                 let comp_type = match second_arg {
                     Some(arg) => match arg.as_str() {
                         "-exe" => CompType::EXE,
@@ -62,14 +84,8 @@ pub fn execute() {
                     },
                     None => CompType::EXE,
                 };
-                // TODO: determine standard depending on config file
-                build_c(comp_type, Standard::C17);
-            },
-            // TODO: Create git repo
-            "new" => create_proj(match second_arg {
-                Some(arg) => arg,
-                None => panic!("Missing second arg"),
-            }),
+                build_c(comp_type, config.c_std);
+            }
             _ => {
                 for (key, val) in cmd_tips {
                     if arg.as_str() == key {
@@ -79,9 +95,12 @@ pub fn execute() {
                     }
                 }
                 if !matched {
-                    println!("`{}` is not a valid argument. Use `help` to see all valid arguments", arg)
+                    println!(
+                        "`{}` is not a valid argument. Use `help` to see all valid arguments",
+                        arg
+                    )
                 }
-            },
+            }
         },
         None => println!("{}", INTRO),
     }
@@ -89,30 +108,13 @@ pub fn execute() {
 
 fn run_c(std: Standard) {
     build_c(CompType::EXE, std);
-    let command = "./example/build/main.exe";
+    let cur_dir_raw = env::current_dir().expect("Failed to get current directory");
+    let cur_dir = cur_dir_raw.to_str().unwrap();
+    let root_name = util::root_dir_name(cur_dir);
+    let command = format!("./build/{root_name}.exe");
 
     let mut cmd = Command::new(command);
-
-    let result = cmd.output();
-
-    match result {
-        Ok(output) => {
-            if output.status.success() {
-                println!(
-                    "Command output:\n{}",
-                    String::from_utf8_lossy(&output.stdout)
-                );
-            } else {
-                eprintln!(
-                    "Command failed with error: {}",
-                    String::from_utf8_lossy(&output.stderr)
-                );
-            }
-        }
-        Err(err) => {
-            eprintln!("Error: {:?}", err);
-        }
-    }
+    cmd.spawn().expect(format!("Failed to run program. Path: {cur_dir}/build/{root_name}.exe").as_str());
 }
 
 fn build_c(comp_type: CompType, std: Standard) {
@@ -120,7 +122,9 @@ fn build_c(comp_type: CompType, std: Standard) {
     let cur_dir_str = cur_dir.to_str().unwrap();
     println!("{}", cur_dir_str);
     let mut builder = Builder::new(cur_dir_str);
-    builder.build(comp_type, std).expect("Failed to build project");
+    builder
+        .build(comp_type, std)
+        .expect("Failed to build project");
 }
 
 fn create_proj(name: &str) {

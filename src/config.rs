@@ -5,24 +5,31 @@ related to the project's configuration
 */
 
 use std::{
-    fs::{read_to_string, File},
+    fs::File,
     io::Read,
 };
 
 use rlua::{Lua, Table};
 
-use crate::builder::Standard;
+use crate::builder::{Standard, Builder};
 
 pub struct ConfigFile {
-    c_std: Standard,
-    proj_version: f32,
-    dependencies: Vec<String>,
+    pub c_std: Standard,
+    pub proj_version: String,
+    pub dependencies: Vec<String>,
 }
 
 impl ConfigFile {
-    pub fn from(path: &str) -> Self {
-        let mut file = File::open(path).expect("Failed to open file");
+    pub fn from(file: &mut File) -> Self {
         let mut buffer = String::new();
+
+        let mut dependencies: Vec<String> = Vec::new();
+        let mut c_std_str = String::new();
+        let mut proj_version = String::new();
+
+        let stds = Builder::get_standards();
+        let mut c_std: Option<&Standard> = None;
+
         file.read_to_string(&mut buffer)
             .expect("Failed to read file");
 
@@ -31,14 +38,34 @@ impl ConfigFile {
         lua.context(|ctx| {
             ctx.load(&buffer).exec().expect("Failed to load context");
 
-            let my_table: Table = ctx.globals().get("Dependencies").expect("Failed to get dependencies");
-            println!("{:?}", my_table);
+            let dep_table: Table = ctx.globals().get("Dependencies").expect("Failed to get dependencies");
+            let versions_table: Table = ctx.globals().get("Versions").expect("Failed to get versions");
 
-            for key in my_table.pairs::<String, String>() {
-                let (k, v) = key.expect("Failed to get key");
-                println!("Key: {}, Value: {}", k, v);
+            versions_table.pairs::<String, String>().into_iter().for_each(|pair| {
+                let (key, val) = pair.expect("Failed to get pair");
+                match key.to_lowercase().as_str() {
+                    "c" => c_std_str = val,
+                    "proj" => proj_version = val,
+                    _ => panic!("invalid version entry")
+                }
+            });
+
+            dep_table.pairs::<String, String>().into_iter().for_each(|key| {
+                let (_, val) = key.expect("Failed to get key");
+                dependencies.push(val);
+            });
+        });
+
+        stds.iter().for_each(|(key, val)| {
+            if &c_std_str == val {
+                c_std = Some(key);
             }
         });
-        todo!()
+
+        if c_std == None {
+            panic!("Invalid C Standard: {:?}", c_std_str)
+        }
+
+        Self { c_std: *c_std.unwrap(), proj_version, dependencies }
     }
 }
