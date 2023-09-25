@@ -39,6 +39,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9cdc71e17332e86d2e1d38c1f99edcb6288ee11b815fb1a4b049eaa2114d369b"
 
 [[package]]
+name = "lua-rs"
+version = "0.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80b99f9360f8abef9103bdf2e226ca57ab232522646e5c3cb07630c526cdabb7"
+dependencies = [
+ "cc",
+ "libc",
+]
+
+[[package]]
 name = "maplit"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -93,6 +103,7 @@ dependencies = [
 name = "surtur"
 version = "0.1.0"
 dependencies = [
+ "lua-rs",
  "maplit",
  "rlua",
 ]

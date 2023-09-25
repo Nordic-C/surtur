@@ -8,7 +8,7 @@ use std::{env, process::Command};
 
 use maplit::hashmap;
 
-use crate::{builder::{Builder, CompType, Standard}, creator::Project};
+use crate::{builder::{Builder, CompType, Standard}, creator::Project, config::ConfigFile};
 
 const INTRO: &str =
 r#"
@@ -34,6 +34,9 @@ pub fn execute() {
         "create" => "new",
         "package" => "bundle"
     };
+    let cur_dir = env::current_dir().expect("Failed to get current directory");
+    let config = ConfigFile::from(format!("{}/project.lua", cur_dir.to_str().expect("failed to get current directory")).as_str());
+
     let args: Vec<String> = env::args().collect();
 
     let first_arg = args.get(1);
