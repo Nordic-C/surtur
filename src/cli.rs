@@ -4,14 +4,15 @@ Interacts with config module to
 gather/store configuration.
 */
 
-use std::{env, fs::File, process::Command};
+use std::{env, fs::{File, self}, process::Command};
 
 use maplit::hashmap;
 
 use crate::{
     builder::{Builder, CompType, Standard},
     config::ConfigFile,
-    creator::Project, util,
+    creator::Project,
+    util,
 };
 
 const INTRO: &str = r#"
@@ -106,16 +107,54 @@ pub fn execute() {
     }
 }
 
+use std::thread;
+
+use std::time::Duration;
+
+// TODO: Extremly hacky please fix
 fn run_c(std: Standard) {
-    build_c(CompType::EXE, std);
     let cur_dir_raw = env::current_dir().expect("Failed to get current directory");
     let cur_dir = cur_dir_raw.to_str().unwrap();
     let root_name = util::root_dir_name(cur_dir);
-    let command = format!("./build/{root_name}.exe");
+    let executable_path = format!("./build/{}.exe", root_name);
 
-    let mut cmd = Command::new(command);
-    cmd.spawn().expect(format!("Failed to run program. Path: {cur_dir}/build/{root_name}.exe").as_str());
+    build_c(CompType::EXE, std);
+
+    let mut file_available = false;
+
+    while !file_available {
+        if fs::metadata(&executable_path).is_ok() {
+            file_available = true;
+        } else {
+            // Sleep for a short duration before checking again
+            thread::sleep(Duration::from_millis(500)); // 500 milliseconds
+        }
+    }
+
+    if file_available {
+        // Create a Command to run the executable
+        let mut cmd = Command::new(&executable_path);
+        cmd.current_dir("./build"); // Set the working directory
+
+        match cmd.status() {
+            Ok(status) => {
+                if status.success() {
+                    println!("Program executed successfully.");
+                } else {
+                    eprintln!("Command failed with exit code: {}", status);
+                }
+            }
+            Err(err) => {
+                eprintln!("Error: {:?}", err);
+            }
+        }
+    } else {
+        eprintln!("Timed out waiting for the executable file to become available.");
+    }
 }
+
+
+
 
 fn build_c(comp_type: CompType, std: Standard) {
     let cur_dir = env::current_dir().expect("Failed to get current directory");
