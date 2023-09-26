@@ -4,7 +4,11 @@ Interacts with config module to
 gather/store configuration.
 */
 
-use std::{env, fs::{File, self}, process::Command};
+use std::{
+    env,
+    fs::{self, File},
+    process::Command,
+};
 
 use maplit::hashmap;
 
@@ -12,7 +16,7 @@ use crate::{
     builder::{Builder, CompType, Standard},
     config::ConfigFile,
     creator::Project,
-    util,
+    util::{self, throw_error, ErrorType}, tips::{self, *},
 };
 
 const INTRO: &str = r#"
@@ -45,7 +49,7 @@ pub fn execute() {
         cur_dir.to_str().expect("failed to get current directory"),
     );
 
-    let mut file = match File::open(&path) {
+    let file = match File::open(&path) {
         Ok(file) => Some(file),
         Err(_) => None,
     };
@@ -63,29 +67,46 @@ pub fn execute() {
             "new" => {
                 create_proj(match second_arg {
                     Some(arg) => arg,
-                    None => panic!("Missing second arg"),
+                    None => throw_error(ErrorType::CREATION, "Failed to set project name", &tips::missing_proj_name()),
                 });
             }
             "run" => {
                 let config = ConfigFile::from(&mut file.unwrap());
-                run_c(config.c_std);
+                match second_arg {
+                    Some(arg) => match arg.as_str() {
+                        "-dbg" => run_c(config.c_std, true),
+                        "-d" => run_c(config.c_std, true),
+                        _ => throw_error(ErrorType::EXECUTION, "Invalid argument for running the program", &invalid_run_arg(&arg)),
+                    },
+                    None => run_c(config.c_std, false),
+                }
             }
             "build" => {
+                let mut actual_args = Vec::new();
+                for (index, arg) in args.iter().enumerate() {
+                    if index > 1 {
+                        actual_args.push(arg)
+                    }
+                }
                 let config = ConfigFile::from(&mut file.unwrap());
-                let comp_type = match second_arg {
-                    Some(arg) => match arg.as_str() {
-                        "-exe" => CompType::EXE,
-                        "-asm" => CompType::ASM,
-                        "-obj" => CompType::OBJ,
-                        "-e" => CompType::EXE,
-                        "-a" => CompType::ASM,
-                        "-s" => CompType::ASM,
-                        "-o" => CompType::OBJ,
-                        _ => panic!("Invalid argument"),
-                    },
-                    None => CompType::EXE,
-                };
-                build_c(comp_type, config.c_std);
+                let mut is_release = false;
+                let mut comp_type = CompType::EXE;
+                for arg in &actual_args {
+                    match arg.as_str() {
+                        "-exe" => comp_type = CompType::EXE,
+                        "-asm" => comp_type = CompType::ASM,
+                        "-obj" => comp_type = CompType::OBJ,
+                        "-e" => comp_type = CompType::EXE,
+                        "-a" => comp_type = CompType::ASM,
+                        "-s" => comp_type = CompType::ASM,
+                        "-o" => comp_type = CompType::OBJ,
+                        "-release" => is_release = true,
+                        "-r" => is_release = true,
+                        _ => throw_error(ErrorType::BUILD, "Invalid argument", &invalid_build_arg(arg)),
+                    }
+                }
+                println!("{:?}, {}", &actual_args, is_release);
+                build_c(comp_type, config.c_std, false, is_release);
             }
             _ => {
                 for (key, val) in cmd_tips {
@@ -112,13 +133,29 @@ use std::thread;
 use std::time::Duration;
 
 // TODO: Extremly hacky please fix
-fn run_c(std: Standard) {
+fn run_c(std: Standard, enable_dbg: bool) {
     let cur_dir_raw = env::current_dir().expect("Failed to get current directory");
     let cur_dir = cur_dir_raw.to_str().unwrap();
     let root_name = util::root_dir_name(cur_dir);
     let executable_path = format!("./build/{}.exe", root_name);
 
-    build_c(CompType::EXE, std);
+    {
+        let mut file_available = true;
+
+        fs::remove_file(format!("build/{}.exe", root_name))
+            .expect("Failed to remove old executable");
+
+        while file_available {
+            if fs::metadata(&executable_path).is_err() {
+                file_available = false;
+            } else {
+                // Sleep for a short duration before checking again
+                thread::sleep(Duration::from_millis(500)); // 500 milliseconds
+            }
+        }
+    }
+
+    build_c(CompType::EXE, std, enable_dbg, false);
 
     let mut file_available = false;
 
@@ -153,16 +190,13 @@ fn run_c(std: Standard) {
     }
 }
 
-
-
-
-fn build_c(comp_type: CompType, std: Standard) {
+fn build_c(comp_type: CompType, std: Standard, enable_dbg: bool, is_release: bool) {
     let cur_dir = env::current_dir().expect("Failed to get current directory");
     let cur_dir_str = cur_dir.to_str().unwrap();
     println!("{}", cur_dir_str);
     let mut builder = Builder::new(cur_dir_str);
     builder
-        .build(comp_type, std)
+        .build(comp_type, std, enable_dbg, is_release)
         .expect("Failed to build project");
 }
 

@@ -11,7 +11,7 @@ and bundling of libraries/programs
 use std::{
     collections::HashMap,
     io::Error,
-    process::{Child, Command, Output},
+    process::{Child, Command},
 };
 
 use maplit::hashmap;
@@ -68,11 +68,18 @@ impl Builder {
         }
     }
 
-    pub fn build(&mut self, comp_type: CompType, std: Standard) -> Result<Child, Error> {
+    pub fn build(&mut self, comp_type: CompType, std: Standard, enable_dbg: bool, is_release: bool) -> Result<Child, Error> {
         let standards = Self::get_standards();
         let standard =format!("-std={}", &standards[&std]);
         let program = &mut self.command;
-        let cmd = match comp_type {
+    
+        if enable_dbg {
+            program.arg("-g");
+        } else if is_release {
+            program.arg("-o3");
+        }
+
+        match comp_type {
             // TODO: linux && macOS file ending
             CompType::EXE => program
                 .arg(&self.source)
@@ -90,8 +97,8 @@ impl Builder {
                 .arg(format!("{}.o", &self.output)),
         }.arg(standard);
 
-        println!("{:?}", cmd);
-        let output = cmd.spawn()?;
+        println!("{:?}", program);
+        let output = program.spawn()?;
         Ok(output)
     }
 
