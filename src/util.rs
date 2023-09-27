@@ -12,12 +12,13 @@ pub enum ErrorType {
     EXECUTION,
     CREATION,
     DEPENDENCIES,
+    MISC,
 }
 
 pub fn throw_error<T>(err_type: ErrorType, msg: &str, ctx: &str) -> T {
     let error_lit = "error".red();
     let err = format!("{} {}: {}", get_err_str(&err_type).red(), error_lit, msg);
-    println!("{err}");
+    println!("\n{err}");
     if ctx != "__None__" {
         println!("Tip: {}", ctx);
     }
@@ -30,5 +31,6 @@ fn get_err_str(err_type: &ErrorType) -> &str {
         ErrorType::EXECUTION => "Execution",
         ErrorType::CREATION => "Project Creation",
         ErrorType::DEPENDENCIES => "Dependencies",
+        ErrorType::MISC => "Misc",
     }
 }

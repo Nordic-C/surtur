@@ -10,13 +10,15 @@ use std::{
     process::Command,
 };
 
+use colored::Colorize;
 use maplit::hashmap;
 
 use crate::{
     builder::{Builder, CompType, Standard},
     config::ConfigFile,
     creator::Project,
-    util::{self, throw_error, ErrorType}, tips::{self, *},
+    tips::*,
+    util::{self, throw_error, ErrorType},
 };
 
 const INTRO: &str = r#"
@@ -44,12 +46,11 @@ pub fn execute() {
     };
     let cur_dir = env::current_dir().expect("Failed to get current directory");
 
-    let path = format!(
-        "{}/project.lua",
-        cur_dir.to_str().expect("failed to get current directory"),
-    );
+    let cur_dir_str = cur_dir.to_str().expect("failed to get current directory");
 
-    let file = match File::open(&path) {
+    let path = format!("{}\\project.lua", cur_dir_str,);
+
+    let mut file = match File::open(&path) {
         Ok(file) => Some(file),
         Err(_) => None,
     };
@@ -61,22 +62,57 @@ pub fn execute() {
 
     let mut matched = false;
 
+    let blue_line = "|".bright_blue();
+
+    let missing_cfg_file = format!(
+        r#"
+    {} Could not locate config file at {}
+    {} 
+    {} Use 
+    {} {}> {} init
+    {} To create a new config file
+    "#,
+        blue_line,
+        path,
+        blue_line,
+        blue_line,
+        blue_line,
+        cur_dir_str,
+        "surtur".yellow(),
+        blue_line,
+    );
+
     match first_arg {
         Some(arg) => match arg.as_str() {
             // TODO: Create git repo
             "new" => {
                 create_proj(match second_arg {
                     Some(arg) => arg,
-                    None => throw_error(ErrorType::CREATION, "Failed to set project name", &tips::missing_proj_name()),
+                    None => throw_error(
+                        ErrorType::CREATION,
+                        "Failed to set project name",
+                        &get_tip(Tip::MissingProjName),
+                    ),
                 });
             }
             "run" => {
-                let config = ConfigFile::from(&mut file.unwrap());
+                let config = ConfigFile::from(match &mut file {
+                    Some(cfg_file) => cfg_file,
+                    None => throw_error(
+                        ErrorType::EXECUTION,
+                        missing_cfg_file.as_str(),
+                        "Failed to find config file",
+                    ),
+                });
                 match second_arg {
                     Some(arg) => match arg.as_str() {
                         "-dbg" => run_c(config.c_std, true),
                         "-d" => run_c(config.c_std, true),
-                        _ => throw_error(ErrorType::EXECUTION, "Invalid argument for running the program", &invalid_run_arg(&arg)),
+                        _ => throw_error(
+                            ErrorType::EXECUTION,
+                            "Invalid argument for running the program",
+                            &get_tip(Tip::InvalidRunArg),
+                        ),
                     },
                     None => run_c(config.c_std, false),
                 }
@@ -88,21 +124,27 @@ pub fn execute() {
                         actual_args.push(arg)
                     }
                 }
-                let config = ConfigFile::from(&mut file.unwrap());
+                let config = ConfigFile::from(match &mut file {
+                    Some(cfg_file) => cfg_file,
+                    None => throw_error(
+                        ErrorType::BUILD,
+                        missing_cfg_file.as_str(),
+                        "Failed to find config file",
+                    ),
+                });
                 let mut is_release = false;
                 let mut comp_type = CompType::EXE;
                 for arg in &actual_args {
                     match arg.as_str() {
-                        "-exe" => comp_type = CompType::EXE,
-                        "-asm" => comp_type = CompType::ASM,
-                        "-obj" => comp_type = CompType::OBJ,
-                        "-e" => comp_type = CompType::EXE,
-                        "-a" => comp_type = CompType::ASM,
-                        "-s" => comp_type = CompType::ASM,
-                        "-o" => comp_type = CompType::OBJ,
-                        "-release" => is_release = true,
-                        "-r" => is_release = true,
-                        _ => throw_error(ErrorType::BUILD, "Invalid argument", &invalid_build_arg(arg)),
+                        "-exe" | "-e" => comp_type = CompType::EXE,
+                        "-asm" | "-a" | "-s" => comp_type = CompType::ASM,
+                        "-obj" | "-o" => comp_type = CompType::OBJ,
+                        "-release" | "-r" => is_release = true,
+                        _ => throw_error(
+                            ErrorType::BUILD,
+                            "Invalid argument",
+                            &get_tip(Tip::InvalidBuildArg),
+                        ),
                     }
                 }
                 println!("{:?}, {}", &actual_args, is_release);
@@ -135,7 +177,11 @@ use std::time::Duration;
 // TODO: Extremly hacky please fix
 fn run_c(std: Standard, enable_dbg: bool) {
     let cur_dir_raw = env::current_dir().expect("Failed to get current directory");
-    let cur_dir = cur_dir_raw.to_str().unwrap();
+    let cur_dir = match cur_dir_raw.to_str() {
+        Some(cur_dir) => cur_dir,
+        None => throw_error(ErrorType::MISC, "Failed to convert current directory to string.
+        Please report this issue here https://github.com/Thepigcat76/surtur/issues", "__None__"),
+    };
     let root_name = util::root_dir_name(cur_dir);
     let executable_path = format!("./build/{}.exe", root_name);
 
@@ -192,7 +238,11 @@ fn run_c(std: Standard, enable_dbg: bool) {
 
 fn build_c(comp_type: CompType, std: Standard, enable_dbg: bool, is_release: bool) {
     let cur_dir = env::current_dir().expect("Failed to get current directory");
-    let cur_dir_str = cur_dir.to_str().unwrap();
+    let cur_dir_str = match cur_dir.to_str() {
+        Some(cur_dir) => cur_dir,
+        None => throw_error(ErrorType::MISC, "Failed to convert current directory to string.
+        Please report this issue here https://github.com/Thepigcat76/surtur/issues", "__None__"),
+    };
     println!("{}", cur_dir_str);
     let mut builder = Builder::new(cur_dir_str);
     builder
