@@ -1,13 +1,9 @@
 /*
-Handling of building and running the c program with gcc.
-This inclues functions for
-building, running, linking and bundling libraries.
+ Handling of building and running the c program with gcc.
+ This inclues functions for
+ building, running, linking and bundling libraries.
 */
 
-/*
-Handling of compiling, runnning, linking
-and bundling of libraries/programs
-*/
 use std::{
     collections::HashMap,
     io::Error,
@@ -16,15 +12,7 @@ use std::{
 
 use maplit::hashmap;
 
-use crate::util;
-
-// TODO: move this to a seperate file
-struct Dependency {
-    /// Used for finding location of dependency
-    name: String,
-    /// Used for switching between versions
-    version: f32,
-}
+use crate::{util, manager::Dependency};
 
 pub struct Builder {
     command: Command,
@@ -68,11 +56,17 @@ impl Builder {
         }
     }
 
-    pub fn build(&mut self, comp_type: CompType, std: Standard, enable_dbg: bool, is_release: bool) -> Result<Child, Error> {
+    pub fn build(
+        &mut self,
+        comp_type: CompType,
+        std: Standard,
+        enable_dbg: bool,
+        is_release: bool,
+    ) -> Result<Child, Error> {
         let standards = Self::get_standards();
-        let standard =format!("-std={}", &standards[&std]);
+        let standard = format!("-std={}", &standards[&std]);
         let program = &mut self.command;
-    
+
         if enable_dbg {
             program.arg("-g");
         } else if is_release {
@@ -95,7 +89,8 @@ impl Builder {
                 .arg(&self.source)
                 .arg("-o")
                 .arg(format!("{}.o", &self.output)),
-        }.arg(standard);
+        }
+        .arg(standard);
 
         println!("{:?}", program);
         let output = program.spawn()?;

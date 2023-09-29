@@ -7,5 +7,5 @@ Versions = {
         
 -- external dependents
 Dependencies = {
-
+    {"test", 6.8}
 }

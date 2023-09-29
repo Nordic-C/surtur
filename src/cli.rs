@@ -1,7 +1,7 @@
 /*
-Handling of commands, arguments.
-Interacts with config module to
-gather/store configuration.
+ Handling of commands, arguments.
+ Interacts with config module to
+ gather/store configuration.
 */
 
 use std::{
@@ -64,6 +64,11 @@ pub fn execute() {
 
     let blue_line = "|".bright_blue();
 
+    let config = match &mut file {
+        Some(cfg_file) => Some(ConfigFile::from(cfg_file)),
+        None => None,
+    };
+
     let missing_cfg_file = format!(
         r#"
     {} Could not locate config file at {}
@@ -96,25 +101,21 @@ pub fn execute() {
                 });
             }
             "run" => {
-                let config = ConfigFile::from(match &mut file {
-                    Some(cfg_file) => cfg_file,
-                    None => throw_error(
-                        ErrorType::EXECUTION,
-                        missing_cfg_file.as_str(),
-                        "Failed to find config file",
-                    ),
-                });
+                let standard = match config {
+                    Some(cfg) => cfg.c_std,
+                    None => throw_error(ErrorType::EXECUTION, "Missing project config file", &missing_cfg_file),
+                };
                 match second_arg {
                     Some(arg) => match arg.as_str() {
-                        "-dbg" => run_c(config.c_std, true),
-                        "-d" => run_c(config.c_std, true),
+                        "-dbg" => run_c(standard, true),
+                        "-d" => run_c(standard, true),
                         _ => throw_error(
                             ErrorType::EXECUTION,
                             "Invalid argument for running the program",
                             &get_tip(Tip::InvalidRunArg),
                         ),
                     },
-                    None => run_c(config.c_std, false),
+                    None => run_c(standard, false),
                 }
             }
             "build" => {
@@ -124,14 +125,11 @@ pub fn execute() {
                         actual_args.push(arg)
                     }
                 }
-                let config = ConfigFile::from(match &mut file {
-                    Some(cfg_file) => cfg_file,
-                    None => throw_error(
-                        ErrorType::BUILD,
-                        missing_cfg_file.as_str(),
-                        "Failed to find config file",
-                    ),
-                });
+                let standard = match config {
+                    Some(cfg) => cfg.c_std,
+                    None => throw_error(ErrorType::BUILD, "Missing project config file", &missing_cfg_file),
+                };
+
                 let mut is_release = false;
                 let mut comp_type = CompType::EXE;
                 for arg in &actual_args {
@@ -148,7 +146,7 @@ pub fn execute() {
                     }
                 }
                 println!("{:?}, {}", &actual_args, is_release);
-                build_c(comp_type, config.c_std, false, is_release);
+                build_c(comp_type, standard, false, is_release);
             }
             _ => {
                 for (key, val) in cmd_tips {

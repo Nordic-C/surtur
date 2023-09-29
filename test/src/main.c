@@ -1,8 +1,6 @@
 #include <stdio.h>
 
 int main(void) {
-    char sussy[] = "Amogus is a funny";
-    printf("%s\n", sussy);
-    printf("Hello, Worldeee!\n");
+    printf("Hello, World!\n");
     return 0;
 }

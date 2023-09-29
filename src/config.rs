@@ -1,7 +1,7 @@
 /*
-Handling of the project's lua config file.
-It includes the lua variable evaluator and all information
-related to the project's configuration
+ Handling of the project's lua config file.
+ It includes the lua variable evaluator and all information
+ related to the project's configuration
 */
 
 use std::{
@@ -9,21 +9,21 @@ use std::{
     io::Read,
 };
 
-use rlua::{Lua, Table};
+use rlua::{Lua, Table, Value};
 
-use crate::builder::{Standard, Builder};
+use crate::{builder::{Standard, Builder}, manager::Dependency};
 
 pub struct ConfigFile {
     pub c_std: Standard,
     pub proj_version: String,
-    pub dependencies: Vec<String>,
+    pub dependencies: Vec<Dependency>,
 }
 
 impl ConfigFile {
     pub fn from(file: &mut File) -> Self {
         let mut buffer = String::new();
 
-        let mut dependencies: Vec<String> = Vec::new();
+        let mut dependencies: Vec<Dependency> = Vec::new();
         let mut c_std_str = String::new();
         let mut proj_version = String::new();
 
@@ -50,10 +50,25 @@ impl ConfigFile {
                 }
             });
 
-            dep_table.pairs::<String, String>().into_iter().for_each(|key| {
-                let (_, val) = key.expect("Failed to get key");
-                dependencies.push(val);
-            });
+            for dep in dep_table.sequence_values::<Table>() {
+                for pair in dep.expect("Failed to get table").sequence_values::<Value>() {
+                    let index = &pair.clone().expect("Failed to get pair").type_name();
+                    match pair.expect("Failed to get dependency pair") {
+                        Value::Integer(int_value) => {
+                            println!("Index {}: Integer {}", index, int_value);
+                        }
+                        Value::String(string_value) => {
+                            println!("Index {}: String '{}'", index, string_value.to_str().expect("Failed to get str"));
+                        }
+                        Value::Number(num_value) => {
+                            println!("Index {}: Number {}", index, num_value);
+                        }
+                        _ => {
+                            println!("Index {}: Unknown data type", index);
+                        }
+                    }
+                }
+            }
         });
 
         stds.iter().for_each(|(key, val)| {
