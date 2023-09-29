@@ -44,11 +44,19 @@ pub fn execute() {
         "create" => "new",
         "package" => "bundle"
     };
-    let cur_dir = env::current_dir().expect("Failed to get current directory");
+    let cur_dir_raw = match env::current_dir() {
+        Ok(dir) => dir,
+        Err(_) => throw_error(ErrorType::MISC, "Failed to get current directory.
+        Please report this issue here https://github.com/Thepigcat76/surtur/issues", "__None__"),
+    };
+    
+    let cur_dir = match cur_dir_raw.to_str() {
+        Some(cur_dir) => cur_dir,
+        None => throw_error(ErrorType::MISC, "Failed to convert current directory to string.
+        Please report this issue here https://github.com/Thepigcat76/surtur/issues", "__None__"),
+    };
 
-    let cur_dir_str = cur_dir.to_str().expect("failed to get current directory");
-
-    let path = format!("{}\\project.lua", cur_dir_str,);
+    let path = format!("{}\\project.lua", cur_dir,);
 
     let mut file = match File::open(&path) {
         Ok(file) => Some(file),
@@ -82,14 +90,13 @@ pub fn execute() {
         blue_line,
         blue_line,
         blue_line,
-        cur_dir_str,
+        cur_dir,
         "surtur".yellow(),
         blue_line,
     );
 
     match first_arg {
         Some(arg) => match arg.as_str() {
-            // TODO: Create git repo
             "new" => {
                 create_proj(match second_arg {
                     Some(arg) => arg,
@@ -174,7 +181,12 @@ use std::time::Duration;
 
 // TODO: Extremly hacky please fix
 fn run_c(std: Standard, enable_dbg: bool) {
-    let cur_dir_raw = env::current_dir().expect("Failed to get current directory");
+    let cur_dir_raw = match env::current_dir() {
+        Ok(dir) => dir,
+        Err(_) => throw_error(ErrorType::MISC, "Failed to get current directory.
+        Please report this issue here https://github.com/Thepigcat76/surtur/issues", "__None__"),
+    };
+
     let cur_dir = match cur_dir_raw.to_str() {
         Some(cur_dir) => cur_dir,
         None => throw_error(ErrorType::MISC, "Failed to convert current directory to string.
@@ -186,8 +198,7 @@ fn run_c(std: Standard, enable_dbg: bool) {
     {
         let mut file_available = true;
 
-        fs::remove_file(format!("build/{}.exe", root_name))
-            .expect("Failed to remove old executable");
+        fs::remove_file(format!("build/{}.exe", root_name)).expect("Failed to remove old executable");
 
         while file_available {
             if fs::metadata(&executable_path).is_err() {
@@ -235,14 +246,19 @@ fn run_c(std: Standard, enable_dbg: bool) {
 }
 
 fn build_c(comp_type: CompType, std: Standard, enable_dbg: bool, is_release: bool) {
-    let cur_dir = env::current_dir().expect("Failed to get current directory");
-    let cur_dir_str = match cur_dir.to_str() {
+    let cur_dir_raw = match env::current_dir() {
+        Ok(dir) => dir,
+        Err(_) => throw_error(ErrorType::MISC, "Failed to get current directory.
+        Please report this issue here https://github.com/Thepigcat76/surtur/issues", "__None__"),
+    };
+
+    let cur_dir = match cur_dir_raw.to_str() {
         Some(cur_dir) => cur_dir,
         None => throw_error(ErrorType::MISC, "Failed to convert current directory to string.
         Please report this issue here https://github.com/Thepigcat76/surtur/issues", "__None__"),
     };
-    println!("{}", cur_dir_str);
-    let mut builder = Builder::new(cur_dir_str);
+    println!("{}", cur_dir);
+    let mut builder = Builder::new(cur_dir);
     builder
         .build(comp_type, std, enable_dbg, is_release)
         .expect("Failed to build project");
