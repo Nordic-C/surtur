@@ -7,9 +7,16 @@ pub struct DepManager {
     dependencies: Vec<Dependency>
 }
 
+#[derive(Debug)]
 pub struct Dependency {
     name: String,
     version: f32,
+}
+
+impl Dependency {
+    pub fn new(name: String, version: f32) -> Self {
+        Self { name: name.to_string(), version }
+    }
 }
 
 impl DepManager {

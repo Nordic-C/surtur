@@ -65,7 +65,7 @@ Versions = {{
         
 -- external dependents
 Dependencies = {{
-
+    -- {{ "dependency_name", 0.1 }}
 }}
         "#,
             name
