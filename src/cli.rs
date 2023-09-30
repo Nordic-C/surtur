@@ -18,7 +18,7 @@ use crate::{
     config::ConfigFile,
     creator::Project,
     tips::*,
-    util::{self, throw_error, ErrorType},
+    util::{self, throw_error, ErrorType}, initiator,
 };
 
 const INTRO: &str = r#"
@@ -155,6 +155,20 @@ pub fn execute() {
                 println!("{:?}, {}", &actual_args, is_release);
                 build_c(comp_type, standard, false, is_release);
             }
+            "init" => {
+                let root_dir = match env::current_dir() {
+                    Ok(root) => match root.to_str() {
+                        Some(str_root) => str_root.to_string(),
+                        None => throw_error(ErrorType::INITIALIZATION, "Failed to convert root directory to a string", "__None__"),
+                    },
+                    Err(_) => throw_error(ErrorType::INITIALIZATION, "Failed to get root directory", "__None__"),
+                };
+                let proj = Project::new(&root_dir);
+
+                println!("{:?}", proj);
+
+                initiator::init_proj(&proj);
+            }
             _ => {
                 for (key, val) in cmd_tips {
                     if arg.as_str() == key {
@@ -198,7 +212,10 @@ fn run_c(std: Standard, enable_dbg: bool) {
     {
         let mut file_available = true;
 
-        fs::remove_file(format!("build/{}.exe", root_name)).expect("Failed to remove old executable");
+        match fs::remove_file(format!("build/{}.exe", root_name)) {
+            Ok(()) => (),
+            Err(_) => (),
+        }
 
         while file_available {
             if fs::metadata(&executable_path).is_err() {

@@ -13,6 +13,7 @@ pub enum ErrorType {
     CREATION,
     DEPENDENCIES,
     MISC,
+    INITIALIZATION,
 }
 
 pub fn throw_error<T>(err_type: ErrorType, msg: &str, ctx: &str) -> T {
@@ -32,5 +33,6 @@ fn get_err_str(err_type: &ErrorType) -> &str {
         ErrorType::CREATION => "Project Creation",
         ErrorType::DEPENDENCIES => "Dependencies",
         ErrorType::MISC => "Misc",
+        ErrorType::INITIALIZATION => "Initialization",
     }
 }
