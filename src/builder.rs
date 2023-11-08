@@ -78,7 +78,7 @@ impl Builder {
             CompType::EXE => program
                 .arg(&self.source)
                 .arg("-o")
-                .arg(format!("{}.exe", &self.output)),
+                .arg(format!("{}", &self.output)),
             CompType::ASM => program
                 .arg("-S")
                 .arg(&self.source)

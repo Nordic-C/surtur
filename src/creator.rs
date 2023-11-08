@@ -26,7 +26,7 @@ int main(void) {
 
 impl Project {
     pub fn new(root_dir: &str) -> Self {
-        let dirs: Vec<&str> = root_dir.split("\\").collect();
+        let dirs: Vec<&str> = root_dir.split("/").collect();
         let name = match dirs.last() {
             Some(name) => *name,
             None => throw_error(ErrorType::CREATION, "Failed to get name of the root directory", "__None__"),

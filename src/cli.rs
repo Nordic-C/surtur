@@ -56,7 +56,7 @@ pub fn execute() {
         Please report this issue here https://github.com/Thepigcat76/surtur/issues", "__None__"),
     };
 
-    let path = format!("{}\\project.lua", cur_dir,);
+    let path = format!("{}/project.lua", cur_dir,);
 
     let mut file = match File::open(&path) {
         Ok(file) => Some(file),
@@ -207,12 +207,12 @@ fn run_c(std: Standard, enable_dbg: bool) {
         Please report this issue here https://github.com/Thepigcat76/surtur/issues", "__None__"),
     };
     let root_name = util::root_dir_name(cur_dir);
-    let executable_path = format!("./build/{}.exe", root_name);
+    let executable_path = format!("./build/{}", root_name);
 
     {
         let mut file_available = true;
 
-        match fs::remove_file(format!("build/{}.exe", root_name)) {
+        match fs::remove_file(format!("build/{}", root_name)) {
             Ok(()) => (),
             Err(_) => (),
         }
@@ -242,8 +242,8 @@ fn run_c(std: Standard, enable_dbg: bool) {
 
     if file_available {
         // Create a Command to run the executable
-        let mut cmd = Command::new(&executable_path);
-        cmd.current_dir("./build"); // Set the working directory
+        let mut cmd = Command::new(format!("{}", &executable_path));
+        cmd.output().expect("Failed to run executable");
 
         match cmd.status() {
             Ok(status) => {
