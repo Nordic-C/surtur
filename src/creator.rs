@@ -29,7 +29,7 @@ impl Project {
         let dirs: Vec<&str> = root_dir.split("/").collect();
         let name = match dirs.last() {
             Some(name) => *name,
-            None => throw_error(ErrorType::CREATION, "Failed to get name of the root directory", "__None__"),
+            None => throw_error(ErrorType::CREATION, "Failed to get name of the root directory", None),
         };
         Self {
             root_dir: root_dir.to_string(),
@@ -44,7 +44,7 @@ impl Project {
             Err(err) => throw_error(
     ErrorType::CREATION,
          "Failed to create root directory. Please report this on https://github.com/Thepigcat76/surtur/issues",
-         format!("{}", err).as_str()
+         Some(format!("{}", err))
             ),
         }
 
@@ -57,7 +57,7 @@ impl Project {
             Err(err) => throw_error(
     ErrorType::CREATION,
          "Failed to create `src` directory. Please report this on https://github.com/Thepigcat76/surtur/issues",
-         format!("{}", err).as_str()
+         Some(format!("{}", err))
             ),
         }
 
@@ -67,7 +67,7 @@ impl Project {
             Err(err) => throw_error(
     ErrorType::CREATION,
          "Failed to create `build` directory. Please report this on https://github.com/Thepigcat76/surtur/issues",
-         format!("{}", err).as_str()
+         Some(format!("{}", err))
             ),
         }
 
@@ -76,6 +76,10 @@ impl Project {
 
         // Main file
         Self::create_main_file(&self.root_dir);
+    }
+
+    fn create_lib(&self) {
+
     }
 
     fn create_git_repo(&self) {
@@ -92,8 +96,8 @@ impl Project {
             r#"-- versioning
 Name = "{}"
 Versions = {{
-    ["c"] = "c17",
-    ["proj"] = "0.1"
+    c = "c17",
+    proj = "0.1"
 }}
         
 -- external dependents
@@ -112,7 +116,7 @@ Dependencies = {{
             Err(err) => throw_error(
     ErrorType::CREATION,
          "Failed to create main file directory. Please report this on https://github.com/Thepigcat76/surtur/issues",
-         format!("{}", err).as_str()
+         Some(format!("{}", err))
             ),
         };
 
@@ -123,7 +127,7 @@ Dependencies = {{
                 Err(err) => throw_error(
         ErrorType::CREATION,
              "Failed to write content to main file. Please report this on https://github.com/Thepigcat76/surtur/issues",
-             format!("{}", err).as_str()
+             Some(format!("{}", err))
                 ),
             };
     }
@@ -134,7 +138,7 @@ Dependencies = {{
             Err(err) => throw_error(
          ErrorType::CREATION,
          "Failed to create config file. Please report this on https://github.com/Thepigcat76/surtur/issues",
-         format!("{}", err).as_str()
+         Some(format!("{}", err))
             ),
         };
 
@@ -144,7 +148,7 @@ Dependencies = {{
                 Err(err) => throw_error(
         ErrorType::CREATION,
              "Failed to write content to cfg file. Please report this on https://github.com/Thepigcat76/surtur/issues",
-             format!("{}", err).as_str()
+             Some(format!("{}", err))
                 ),
             }
     }

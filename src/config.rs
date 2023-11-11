@@ -9,8 +9,8 @@ use std::{fs::File, io::Read};
 use rlua::{Lua, Table, Value};
 
 use crate::{
-    builder::{Builder, Standard},
-    manager::Dependency,
+    compiler::{Compiler, Standard},
+    deps::Dependency,
 };
 
 pub struct ConfigFile {
@@ -27,7 +27,7 @@ impl ConfigFile {
         let mut c_std_str = String::new();
         let mut proj_version = String::new();
 
-        let stds = Builder::get_standards();
+        let stds = Compiler::get_standards();
         let mut c_std: Option<&Standard> = None;
 
         file.read_to_string(&mut buffer)
@@ -90,12 +90,13 @@ impl ConfigFile {
                         }
                     }
                 }
-                let dependency = Dependency::new(name, version as f32);
+                let dependency = Dependency::new(name, "https://github.com/Thepigcat76/surtur-test.git".to_string(), version as f32);
                 dependencies.push(dependency);
                 println!("{:?}", dependencies);
             }
         });
 
+        // version selection
         stds.iter().for_each(|(key, val)| {
             if &c_std_str == val {
                 c_std = Some(key);

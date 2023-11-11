@@ -12,9 +12,9 @@ use std::{
 
 use maplit::hashmap;
 
-use crate::{util, manager::Dependency};
+use crate::{util, deps::Dependency};
 
-pub struct Builder {
+pub struct Compiler {
     command: Command,
     dependencies: Vec<Dependency>,
     output: String,
@@ -41,7 +41,7 @@ pub enum CompType {
     OBJ,
 }
 
-impl Builder {
+impl Compiler {
     pub fn new(cur_dir: &str) -> Self {
         let root_name = util::root_dir_name(cur_dir);
         let source = format!("{}/src/main.c", cur_dir);

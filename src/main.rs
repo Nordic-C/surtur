@@ -1,12 +1,14 @@
-mod builder;
+use cli::Cli;
+
+mod compiler;
 mod cli;
 mod config;
 mod creator;
 mod initiator;
-mod manager;
+mod deps;
 mod util;
 mod tips;
 
 fn main() {
-    cli::execute();
+    Cli::new().execute();
 }

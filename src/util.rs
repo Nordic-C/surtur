@@ -16,13 +16,16 @@ pub enum ErrorType {
     INITIALIZATION,
 }
 
-pub fn throw_error<T>(err_type: ErrorType, msg: &str, ctx: &str) -> T {
+pub fn throw_error<T>(err_type: ErrorType, msg: &str, ctx: Option<String>) -> T {
     let error_lit = "error".red();
     let err = format!("{} {}: {}", get_err_str(&err_type).red(), error_lit, msg);
+
     println!("\n{err}");
-    if ctx != "__None__" {
-        println!("Tip: {}", ctx);
+
+    if let Some(context) = ctx {
+        println!("Tip: {}", context);
     }
+
     process::exit(0);
 }
 
