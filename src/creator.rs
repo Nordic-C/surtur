@@ -1,26 +1,24 @@
 /* Creation and initialization of surtur C project */
 
 use std::{
-    env,
     fs::{self, File},
     io::Write,
 };
 
 use git2::{Repository, RepositoryInitOptions};
 
-use crate::util::{throw_error, ErrorType};
+use crate::util::{throw_error, ErrorType, self};
 
 #[derive(Debug)]
 pub struct Project {
     pub root_dir: String,
-    pub name: String
+    pub name: String,
 }
 
 const MAIN_FILE_LAYOUT: &str = r#"#include <stdio.h>
 
 int main(void) {
     printf("Hello, World!\n");
-    return 0;
 }
 "#;
 
@@ -29,7 +27,11 @@ impl Project {
         let dirs: Vec<&str> = root_dir.split("/").collect();
         let name = match dirs.last() {
             Some(name) => *name,
-            None => throw_error(ErrorType::CREATION, "Failed to get name of the root directory", None),
+            None => throw_error(
+                ErrorType::CREATION,
+                "Failed to get name of the root directory",
+                None,
+            ),
         };
         Self {
             root_dir: root_dir.to_string(),
@@ -39,37 +41,13 @@ impl Project {
 
     pub fn create(&self) {
         // Rooot dir
-        match fs::create_dir(format!("{}", self.name)) {
-            Ok(()) => (),
-            Err(err) => throw_error(
-    ErrorType::CREATION,
-         "Failed to create root directory. Please report this on https://github.com/Thepigcat76/surtur/issues",
-         Some(format!("{}", err))
-            ),
-        }
+        self.create_src_dir(&self.name);
 
         // Git repo
         self.create_git_repo();
 
         // Source dir
-        match fs::create_dir(format!("{}/src", self.name)) {
-            Ok(()) => (),
-            Err(err) => throw_error(
-    ErrorType::CREATION,
-         "Failed to create `src` directory. Please report this on https://github.com/Thepigcat76/surtur/issues",
-         Some(format!("{}", err))
-            ),
-        }
-
-        // Build dir
-        match fs::create_dir(format!("{}/build", self.name)) {
-            Ok(()) => (),
-            Err(err) => throw_error(
-    ErrorType::CREATION,
-         "Failed to create `build` directory. Please report this on https://github.com/Thepigcat76/surtur/issues",
-         Some(format!("{}", err))
-            ),
-        }
+        self.create_dir("src");
 
         // Cfg file
         Self::create_cfg_file(&self.root_dir, &self.name);
@@ -78,9 +56,22 @@ impl Project {
         Self::create_main_file(&self.root_dir);
     }
 
-    fn create_lib(&self) {
-
+    fn create_dir(&self, name: &str) {
+        util::create_dir(&format!("{}/{}", self.name, name))
     }
+
+    fn create_src_dir(&self, name: &str) {
+        match fs::create_dir(&self.name) {
+            Ok(()) => (),
+            Err(err) => throw_error(
+    ErrorType::CREATION,
+         &format!("Failed to create `{}` directory. Please report this on https://github.com/Thepigcat76/surtur/issues", name),
+         Some(format!("{}", err))
+            ),
+        }
+    }
+
+    fn create_lib(&self) {}
 
     fn create_git_repo(&self) {
         // Initialize options for creating the repository.

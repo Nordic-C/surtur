@@ -12,11 +12,11 @@ use std::{
 
 use maplit::hashmap;
 
-use crate::{util, deps::Dependency};
+use crate::{util, deps::DepManager};
 
 pub struct Compiler {
     command: Command,
-    dependencies: Vec<Dependency>,
+    dependencies: DepManager,
     output: String,
     source: String,
 }
@@ -50,7 +50,7 @@ impl Compiler {
         let command = Command::new("gcc");
         Self {
             command,
-            dependencies,
+            dependencies: DepManager::new(dependencies),
             output: output.to_string(),
             source: source.to_string(),
         }

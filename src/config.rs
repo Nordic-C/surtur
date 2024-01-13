@@ -10,13 +10,13 @@ use rlua::{Lua, Table, Value};
 
 use crate::{
     compiler::{Compiler, Standard},
-    deps::Dependency,
+    deps::{Dependency, DepManager},
 };
 
 pub struct ConfigFile {
     pub c_std: Standard,
     pub proj_version: String,
-    pub dependencies: Vec<Dependency>,
+    pub dependencies: DepManager,
 }
 
 impl ConfigFile {
@@ -65,7 +65,7 @@ impl ConfigFile {
             // Iterating over dependencies
             for dep in dep_table.sequence_values::<Table>() {
                 let mut version = 0.0;
-                let mut name = String::new();
+                let mut origin = String::new();
                 for pair in dep
                     .expect("Failed to get table")
                     .sequence_values::<Value>()
@@ -75,12 +75,12 @@ impl ConfigFile {
                             version = int_value as f64;
                         }
                         Value::String(string_value) => {
-                            let str_name = string_value
+                            let origin_lit = string_value
                                 .to_str()
                                 .expect("Failed to convert to str")
                                 .to_string();
 
-                            name = str_name;
+                            origin = origin_lit;
                         }
                         Value::Number(num_value) => {
                             version = num_value as f64;
@@ -90,7 +90,7 @@ impl ConfigFile {
                         }
                     }
                 }
-                let dependency = Dependency::new(name, "https://github.com/Thepigcat76/surtur-test.git".to_string(), version as f32);
+                let dependency = Dependency::new(&origin, version as f32);
                 dependencies.push(dependency);
                 println!("{:?}", dependencies);
             }
@@ -110,7 +110,7 @@ impl ConfigFile {
         Self {
             c_std: *c_std.unwrap(),
             proj_version,
-            dependencies,
+            dependencies: DepManager::new(dependencies),
         }
     }
 }

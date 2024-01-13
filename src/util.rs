@@ -1,4 +1,4 @@
-use std::process;
+use std::{process, fs};
 
 use colored::Colorize;
 
@@ -37,5 +37,16 @@ fn get_err_str(err_type: &ErrorType) -> &str {
         ErrorType::DEPENDENCIES => "Dependencies",
         ErrorType::MISC => "Misc",
         ErrorType::INITIALIZATION => "Initialization",
+    }
+}
+
+pub fn create_dir(dir: &str) {
+    match fs::create_dir(dir) {
+        Ok(()) => (),
+        Err(err) => throw_error(
+ErrorType::CREATION,
+     &format!("Failed to create `{}` directory. Please report this on https://github.com/Thepigcat76/surtur/issues", dir),
+     Some(format!("{}", err))
+        ),
     }
 }

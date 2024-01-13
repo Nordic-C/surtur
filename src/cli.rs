@@ -19,6 +19,7 @@ use crate::{
     compiler::{CompType, Compiler},
     config::ConfigFile,
     creator::Project,
+    deps::DepManager,
     initiator,
     tips::*,
     util::{self, throw_error, ErrorType},
@@ -66,15 +67,12 @@ impl Cli {
             ),
         };
 
-
         let path = format!("{}/project.lua", cur_dir,);
 
         let mut file = match File::open(&path) {
             Ok(file) => Some(file),
             Err(_) => None,
         };
-
-        let blue_line = "|".bright_blue();
 
         let cfg = match &mut file {
             Some(cfg_file) => Some(ConfigFile::from(cfg_file)),
@@ -115,19 +113,17 @@ impl Cli {
                         ),
                     });
                 }
-                "run" => {
-                    match second_arg {
-                        Some(arg) => match arg.as_str() {
-                            "-dbg" | "-d" => self.run_c(true),
-                            _ => throw_error(
-                                ErrorType::EXECUTION,
-                                "Invalid argument for running the program",
-                                Some(get_tip(Tip::InvalidRunArg)),
-                            ),
-                        },
-                        None => self.run_c(false),
-                    }
-                }
+                "run" => match second_arg {
+                    Some(arg) => match arg.as_str() {
+                        "-dbg" | "-d" => self.run_c(true),
+                        _ => throw_error(
+                            ErrorType::EXECUTION,
+                            "Invalid argument for running the program",
+                            Some(get_tip(Tip::InvalidRunArg)),
+                        ),
+                    },
+                    None => self.run_c(false),
+                },
                 "build" => {
                     let mut actual_args = self.args.clone();
                     actual_args.remove(0);
@@ -171,7 +167,18 @@ impl Cli {
                     initiator::init_proj(&proj);
                 }
                 "add" => {
+                    todo!()
+                }
+                "help" => {
+                    todo!()
+                }
+                "dbg-deps" => {
+                    let config = self.cfg.as_ref().expect("Failed to get config file");
 
+                    let dep_manager = &config.dependencies;
+                    dep_manager.init_dep_dir();
+                    dep_manager.get_dep(0).expect("Failed to get dependency 0");
+                    dep_manager.get_dep(1).expect("Failed to get dependency 1");
                 }
                 _ => {
                     for (key, val) in cmd_tips {
@@ -254,7 +261,7 @@ impl Cli {
     fn build_c(&self, comp_type: CompType, enable_dbg: bool, is_release: bool) {
         let blue_line = "|".bright_blue();
         let path = format!("{}/project.lua", self.cur_dir);
-        
+
         let missing_cfg_file = format!(
             r#"
     {} Could not locate config file at {}
@@ -276,7 +283,11 @@ impl Cli {
         let mut builder = Compiler::new(&self.cur_dir);
         let cfg = match &self.cfg {
             Some(cfg) => cfg,
-            None => throw_error(ErrorType::EXECUTION, "Missing project config file", Some(missing_cfg_file)),
+            None => throw_error(
+                ErrorType::EXECUTION,
+                "Missing project config file",
+                Some(missing_cfg_file),
+            ),
         };
         builder
             .build(comp_type, cfg.c_std, enable_dbg, is_release)
