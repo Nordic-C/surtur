@@ -3,7 +3,6 @@
 /// the main.c file and the project.lua config.
 /// In addition to that there are also are helper
 /// functions for creating all directories and files
-
 use std::{
     fs::{self, File},
     io::Write,
@@ -11,7 +10,7 @@ use std::{
 
 use git2::{Repository, RepositoryInitOptions};
 
-use crate::util::{throw_error, ErrorType, self};
+use crate::util::{self, throw_error, ErrorType};
 
 #[derive(Debug)]
 pub struct Project {
@@ -46,7 +45,7 @@ impl Project {
 
     pub fn create(&self) {
         // Rooot dir
-        self.create_src_dir(&self.name);
+        self.create_root_dir(&self.name);
 
         // Git repo
         self.create_git_repo();
@@ -65,7 +64,7 @@ impl Project {
         util::create_dir(&format!("{}/{}", self.name, name))
     }
 
-    fn create_src_dir(&self, name: &str) {
+    fn create_root_dir(&self, name: &str) {
         match fs::create_dir(&self.name) {
             Ok(()) => (),
             Err(err) => throw_error(
