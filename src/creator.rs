@@ -1,4 +1,4 @@
-/* Creation and initialization of surtur C project */
+/* Creation and initialization of a new surtur C project */
 
 use std::{
     fs::{self, File},
@@ -15,6 +15,7 @@ pub struct Project {
     pub name: String,
 }
 
+// TODO: try using \ to make it look better
 const MAIN_FILE_LAYOUT: &str = r#"#include <stdio.h>
 
 int main(void) {

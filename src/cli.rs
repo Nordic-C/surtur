@@ -1,28 +1,20 @@
 /*
- Handling of commands, arguments.
- Interacts with config module to
- gather/store configuration.
-*/
+ * Handling of commands, arguments.
+ * Interacts with config module to
+ * gather/store configuration.
+ */
 
 use std::{
-    env,
-    fs::{self, File},
-    process::Command,
-    thread,
-    time::Duration,
+    env, fs::{self, File}, process::Command, thread, time::Duration,
 };
 
+use clap::{arg, command, value_parser, ArgMatches};
+use clutils::map;
 use colored::Colorize;
-use maplit::hashmap;
+use clap::Command as CCommand;
 
 use crate::{
-    compiler::{CompType, Compiler},
-    config::ConfigFile,
-    creator::Project,
-    deps::DepManager,
-    initiator,
-    tips::*,
-    util::{self, throw_error, ErrorType},
+    compiler::{CompType, Compiler}, config::ConfigFile, creator::Project, initiator, subcommand, tips::*, util::{self, throw_error, ErrorType}
 };
 
 const INTRO: &str = r#"
@@ -87,14 +79,14 @@ impl Cli {
     }
 
     pub fn execute(&self) {
-        let cmd_tips = hashmap! {
+        let cmd_tips = map! [
             "uninstall" => "remove",
             "install" => "add",
             "compile" => "build",
             "execute" => "run",
             "create" => "new",
             "package" => "bundle"
-        };
+        ];
 
         let first_arg = self.args.get(1);
         let second_arg = self.args.get(2);
@@ -141,7 +133,7 @@ impl Cli {
                             Some(get_tip(Tip::InvalidBuildArg)),
                         ),
                     });
-                    println!("{:?}, {}", &actual_args, is_release);
+                    dbg!("{:?}, {}", &actual_args, is_release);
                     self.build_c(comp_type, false, is_release);
                 }
                 "init" => {
@@ -162,7 +154,7 @@ impl Cli {
                     };
                     let proj = Project::new(&root_dir);
 
-                    println!("{:?}", proj);
+                    dbg!("{:?}", &proj);
 
                     initiator::init_proj(&proj);
                 }
@@ -184,12 +176,12 @@ impl Cli {
                     for (key, val) in cmd_tips {
                         if arg.as_str() == key {
                             matched = true;
-                            println!("`{}` is not a valid argument. Use `{}` instead", key, val);
+                            eprintln!("`{}` is not a valid argument. Use `{}` instead", key, val);
                             break;
                         }
                     }
                     if !matched {
-                        println!(
+                        eprintln!(
                             "`{}` is not a valid argument. Use `help` to see all valid arguments",
                             arg
                         )
@@ -206,21 +198,10 @@ impl Cli {
         let executable_path = format!("./build/{}", root_name);
 
         {
-            let mut file_available = true;
-
-            match fs::remove_file(format!("build/{}", root_name)) {
-                Ok(()) => (),
-                Err(_) => (),
-            }
-
-            while file_available {
-                if fs::metadata(&executable_path).is_err() {
-                    file_available = false;
-                } else {
-                    // Sleep for a short duration before checking again
-                    thread::sleep(Duration::from_millis(500)); // 500 milliseconds
-                }
-            }
+            let mut program = Command::new("rm");
+            let cmd = program.arg(&executable_path);
+            let mut child = cmd.spawn().expect("Failed to spawn child");
+            child.wait().expect("Failed to get exitstatus");
         }
 
         self.build_c(CompType::EXE, enable_dbg, false);
@@ -232,7 +213,7 @@ impl Cli {
                 file_available = true;
             } else {
                 // Sleep for a short duration before checking again
-                thread::sleep(Duration::from_millis(500)); // 500 milliseconds
+                thread::sleep(Duration::from_millis(100)); // 500 milliseconds
             }
         }
 
@@ -279,7 +260,6 @@ impl Cli {
             "surtur".yellow(),
             blue_line,
         );
-        println!("{}", self.cur_dir);
         let mut builder = Compiler::new(&self.cur_dir);
         let cfg = match &self.cfg {
             Some(cfg) => cfg,
@@ -297,5 +277,43 @@ impl Cli {
     fn create_proj(&self, name: &str) {
         let project = Project::new(name);
         project.create();
+    }
+
+    fn match_cmd(arg_matches: ArgMatches) {
+        todo!()
+    }
+
+    fn handle_cmd() -> ArgMatches {
+        command!()
+            .subcommand(CCommand::new("run").about("Run the current binary project"))
+            .subcommand(
+                CCommand::new("build")
+                    .about("Build the project into a library or executable")
+                    .arg(arg!(-s --asm "Compile the program to assembly").required(false))
+                    .arg(arg!(-o --obj "Compile the program to an object file").required(false))
+                    .arg(
+                        arg!(-x --exe "Compile the program to an exectuable (default)").required(false),
+                    )
+                    .arg(
+                        arg!(-r --release "Compile the program in release mode (better optimization)")
+                            .required(false),
+                    ),
+            )
+            .subcommand(subcommand!(
+                "add",
+                "Create a new project",
+                arg!(<NAME> "Name for the project")
+            ))
+            .subcommand(subcommand!(
+                "remove",
+                "remove a dependency",
+                arg!(<DEPENDENCY> "dependency to remove")
+            ))
+            .subcommand(subcommand!(
+                "new",
+                "create a new project",
+                arg!(<NAME> "name for the project")
+            ))
+            .get_matches()
     }
 }

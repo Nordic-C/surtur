@@ -1,13 +1,14 @@
 use cli::Cli;
 
-mod compiler;
 mod cli;
+mod compiler;
 mod config;
 mod creator;
-mod initiator;
 mod deps;
-mod util;
+mod initiator;
+mod macros;
 mod tips;
+mod util;
 
 fn main() {
     Cli::new().execute();

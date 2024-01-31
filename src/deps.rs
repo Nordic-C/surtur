@@ -16,7 +16,6 @@ pub struct DepManager {
 
 #[derive(Debug)]
 pub struct Dependency {
-    // TODO: change version format
     version: f32,
     origin: String,
 }

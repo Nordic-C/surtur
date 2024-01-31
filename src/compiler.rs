@@ -1,8 +1,8 @@
 /*
- Handling of building and running the c program with gcc.
- This inclues functions for
- building, running, linking and bundling libraries.
-*/
+ * Handling of building and running the c program with gcc.
+ * This inclues functions for
+ * building, running, linking and bundling libraries.
+ */
 
 use std::{
     collections::HashMap,
@@ -10,13 +10,13 @@ use std::{
     process::{Child, Command},
 };
 
-use maplit::hashmap;
+use clutils::map;
 
 use crate::{util, deps::DepManager};
 
 pub struct Compiler {
     command: Command,
-    dependencies: DepManager,
+    deps: DepManager,
     output: String,
     source: String,
 }
@@ -46,11 +46,11 @@ impl Compiler {
         let root_name = util::root_dir_name(cur_dir);
         let source = format!("{}/src/main.c", cur_dir);
         let output = format!("{}/build/{}", cur_dir, root_name);
-        let dependencies = Vec::new();
+        let deps = Vec::new();
         let command = Command::new("gcc");
         Self {
             command,
-            dependencies: DepManager::new(dependencies),
+            deps: DepManager::new(deps),
             output: output.to_string(),
             source: source.to_string(),
         }
@@ -92,13 +92,12 @@ impl Compiler {
         }
         .arg(standard);
 
-        println!("{:?}", program);
         let output = program.spawn()?;
         Ok(output)
     }
 
     pub fn get_standards() -> HashMap<Standard, String> {
-        let standards = hashmap! {
+        let standards = map! {
             Standard::C89 => String::from("c89"),
             Standard::C99 => String::from("c99"),
             Standard::C11 => String::from("c11"),
@@ -108,7 +107,7 @@ impl Compiler {
             Standard::GNU99 => String::from("gnu99"),
             Standard::GNU11 => String::from("gnu11"),
             Standard::GNU17 => String::from("gnu17"),
-            Standard::GNU2X => String::from("gnu2x"),
+            Standard::GNU2X => String::from("gnu2x")
         };
         standards
     }
