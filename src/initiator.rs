@@ -1,4 +1,10 @@
-/* Handling of fixing and initializing Surtur projects */
+/// Handling of initialization and
+/// fixing of projects. This will
+/// add missing config files or
+/// fix issues [WIP]
+/// 
+/// Later on, it will also be able
+/// to migrate Make projects
 
 use std::fs;
 

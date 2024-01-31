@@ -1,4 +1,8 @@
-/* Creation and initialization of a new surtur C project */
+/// Handling of creating new binary- adn library
+/// projects. Includes example layout for both
+/// the main.c file and the project.lua config.
+/// In addition to that there are also are helper
+/// functions for creating all directories and files
 
 use std::{
     fs::{self, File},
@@ -84,22 +88,21 @@ impl Project {
     }
 
     fn get_cfg_file_layout(name: &str) -> String {
-        let layout = format!(
-            r#"-- versioning
-Name = "{}"
-Versions = {{
-    c = "c17",
-    proj = "0.1"
-}}
-        
--- external dependents
-Dependencies = {{
-    -- {{ "dependency_name", 0.1 }}
-}}
-"#,
+        format!(
+            concat!(
+                "\n-- versioning\n",
+                "Name = \"{}\"\n",
+                "Versions = {{\n",
+                "    c = \"c17\",\n",
+                "    proj = \"0.1\"\n",
+                "}}\n",
+                "\n-- external dependents\n",
+                "Dependencies = {{\n",
+                "    -- {{ \"dependency_name\", 0.1 }}\n",
+                "}}\n"
+            ),
             name
-        );
-        layout
+        )
     }
 
     pub fn create_main_file(root_dir: &str) {

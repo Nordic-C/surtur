@@ -1,4 +1,8 @@
-/* This is for providing the user with tips for specifc errors */
+use std::fmt::Display;
+
+/// Providing user with tips when
+/// encountering an error or when
+/// getting started with surtur
 
 use colored::Colorize;
 
@@ -8,15 +12,17 @@ pub enum Tip {
     InvalidBuildArg,
 }
 
-impl Tip {
-    pub fn literal(&self) -> &str {
-        match self {
+impl Display for Tip {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
             Self::InvalidRunArg => "Replace with a valid argument like -dbg or leave empty",
             Self::MissingProjName => "Put your project's name after `new`",
             Self::InvalidBuildArg => "Replace with a valid argument like -release or -asm",
-        }
+        })
     }
+}
 
+impl Tip {
     pub fn get_cmd(&self) -> &str {
         match self {
             Self::InvalidRunArg => "run -dbg",
@@ -54,6 +60,6 @@ pub fn get_tip(tip: Tip) -> String {
         blue_line,
         arrow.yellow(),
         blue_line,
-        tip.literal()
+        tip
     )
 }

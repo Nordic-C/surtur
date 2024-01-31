@@ -1,8 +1,6 @@
-/*
- * Handling of building and running the c program with gcc.
- * This inclues functions for
- * building, running, linking and bundling libraries.
- */
+/// Handling of building and running the c program with gcc.
+/// This inclues functions for
+/// building, running, linking and bundling libraries.
 
 use std::{
     collections::HashMap,
@@ -28,17 +26,17 @@ pub enum Standard {
     C11,
     C17,
     C2X,
-    GNU89,
-    GNU99,
-    GNU11,
-    GNU17,
-    GNU2X,
+    Gnu89,
+    Gnu99,
+    Gnu11,
+    Gnu17,
+    Gnu2X,
 }
 
 pub enum CompType {
-    EXE,
-    ASM,
-    OBJ,
+    Exe,
+    Asm,
+    Obj,
 }
 
 impl Compiler {
@@ -75,16 +73,16 @@ impl Compiler {
 
         match comp_type {
             // TODO: linux && macOS file ending
-            CompType::EXE => program
+            CompType::Exe => program
                 .arg(&self.source)
                 .arg("-o")
                 .arg(format!("{}", &self.output)),
-            CompType::ASM => program
+            CompType::Asm => program
                 .arg("-S")
                 .arg(&self.source)
                 .arg("-o")
                 .arg(format!("{}.s", &self.output)),
-            CompType::OBJ => program
+            CompType::Obj => program
                 .arg("-c")
                 .arg(&self.source)
                 .arg("-o")
@@ -103,12 +101,102 @@ impl Compiler {
             Standard::C11 => String::from("c11"),
             Standard::C17 => String::from("c17"),
             Standard::C2X => String::from("c2x"),
-            Standard::GNU89 => String::from("gnu89"),
-            Standard::GNU99 => String::from("gnu99"),
-            Standard::GNU11 => String::from("gnu11"),
-            Standard::GNU17 => String::from("gnu17"),
-            Standard::GNU2X => String::from("gnu2x")
+            Standard::Gnu89 => String::from("gnu89"),
+            Standard::Gnu99 => String::from("gnu99"),
+            Standard::Gnu11 => String::from("gnu11"),
+            Standard::Gnu17 => String::from("gnu17"),
+            Standard::Gnu2X => String::from("gnu2x")
         };
         standards
+    }
+}
+
+/// This module provides wrappings around
+/// the Compiler for easily running and building
+/// everything
+pub mod executor {
+    use std::{fs, process::Command, thread, time::Duration};
+
+    use colored::Colorize;
+
+    use crate::{cli::Cli, util::{self, throw_error, ErrorType}};
+
+    use super::{CompType, Compiler};
+
+    pub fn run_c(cli: &Cli, enable_dbg: bool) {
+        let root_name = util::root_dir_name(&cli.cur_dir);
+        let executable_path = format!("./build/{}", root_name);
+
+        {
+            let mut program = Command::new("rm");
+            let cmd = program.arg(&executable_path);
+            let mut child = cmd.spawn().expect("Failed to spawn child");
+            child.wait().expect("Failed to get exitstatus");
+        }
+
+        self::build_c(cli, CompType::Exe, enable_dbg, false);
+
+        let mut file_available = false;
+
+        while !file_available {
+            match fs::metadata(&executable_path) {
+                Ok(_) => file_available = true,
+                // Wait for executable to be available
+                Err(_) => thread::sleep(Duration::from_millis(100)),
+            }
+        }
+
+        match file_available {
+            true => {
+                // Create a Command to run the executable
+                let mut cmd = Command::new(format!("{}", &executable_path));
+                cmd.output().expect("Failed to run executable");
+
+                match cmd.status() {
+                    Ok(status) => {
+                        if !status.success() {
+                            eprintln!("Command failed with exit code: {}", status);
+                        }
+                    }
+                    Err(err) => eprintln!("Error: {:?}", err),
+                }
+            }
+            false => eprintln!("Timed out waiting for the executable file to become available."),
+        }
+    }
+
+    pub fn build_c(cli: &Cli, comp_type: CompType, enable_dbg: bool, is_release: bool) {
+        let blue_line = "|".bright_blue();
+        let path = format!("{}/project.lua", cli.cur_dir);
+
+        let missing_cfg_file = format!(
+            r#"
+    {} Could not locate config file at {}
+    {} 
+    {} Use 
+    {} {}> {} init
+    {} To create a new config file
+    "#,
+            blue_line,
+            path,
+            blue_line,
+            blue_line,
+            blue_line,
+            cli.cur_dir,
+            "surtur".yellow(),
+            blue_line,
+        );
+        let mut builder = Compiler::new(&cli.cur_dir);
+        let cfg = match &cli.cfg {
+            Some(cfg) => cfg,
+            None => throw_error(
+                ErrorType::EXECUTION,
+                "Missing project config file",
+                Some(missing_cfg_file),
+            ),
+        };
+        builder
+            .build(comp_type, cfg.c_std, enable_dbg, is_release)
+            .expect("Failed to build project");
     }
 }

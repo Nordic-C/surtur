@@ -1,11 +1,8 @@
-/*
- * Handling of the project's lua config file.
- * It includes the lua variable evaluator and all information
- * related to the project's configuration
- */
+/// Handling of the project's lua config file.
+/// It includes the lua parser and all information
+/// related to the project's configuration
 
-use std::{fs::File, io::Read};
-
+use clutils::files::FileHandler;
 use rlua::{Lua, Table, Value};
 
 use crate::{
@@ -20,9 +17,7 @@ pub struct ConfigFile {
 }
 
 impl ConfigFile {
-    pub fn from(file: &mut File) -> Self {
-        let mut buffer = String::new();
-
+    pub fn from(file: FileHandler) -> Self {
         let mut dependencies: Vec<Dependency> = Vec::new();
         let mut c_std_str = String::new();
         let mut proj_version = String::new();
@@ -30,13 +25,10 @@ impl ConfigFile {
         let stds = Compiler::get_standards();
         let mut c_std: Option<&Standard> = None;
 
-        file.read_to_string(&mut buffer)
-            .expect("Failed to read file");
-
         let lua = Lua::new();
 
         lua.context(|ctx| {
-            ctx.load(&buffer).exec().expect("Failed to load context");
+            ctx.load(&file.content).exec().expect("Failed to load context");
 
             // dependencies
             let dep_table: Table = ctx

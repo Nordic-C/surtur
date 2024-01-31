@@ -1,3 +1,5 @@
+/// Create a subcommand with an arg parser
+/// that parses the arg to a PathBuf
 #[macro_export]
 macro_rules! subcommand {
     ($name:expr, $about:expr, $arg:expr) => {{

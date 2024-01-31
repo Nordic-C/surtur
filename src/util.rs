@@ -1,12 +1,15 @@
+/// Provides various utility functions
+
 use std::{process, fs};
 
 use colored::Colorize;
 
 pub fn root_dir_name(cur_dir: &str) -> &str {
     let dirs: Vec<&str> = cur_dir.split("/").collect();
-    dirs[dirs.len() - 1]
+    dirs.last().unwrap_or_else(|| panic!("Failed to get current dir. Provided dir: {} is invalid", cur_dir))
 }
 
+// TODO: use crate for errors
 pub enum ErrorType {
     BUILD,
     EXECUTION,

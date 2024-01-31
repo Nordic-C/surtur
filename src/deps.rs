@@ -1,13 +1,19 @@
-/*
- Handling of dependency managment including
- installation, updating, uninstalling etc...
-*/
+/// Handling of project dependencies and
+/// utility functions for it.
+/// It's main part is the dependency manager
+/// for managing the dependencies of your
+/// project. It stores all of your project's
+/// dependencies.
+/// 
+/// Individula dependencies are in the Dependency
+/// struct and store basic information about the
+/// specific dependency
 
 use std::{error::Error, fmt::Display};
 
 use git2::Repository;
 
-use crate::{config::ConfigFile, util};
+use crate::util;
 
 #[derive(Debug, Default)]
 pub struct DepManager {
