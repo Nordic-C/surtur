@@ -10,7 +10,7 @@ use std::{
 
 use git2::{Repository, RepositoryInitOptions};
 
-use crate::util::{self, throw_error, ErrorType};
+use crate::util;
 
 #[derive(Debug)]
 pub struct Project {
@@ -31,11 +31,7 @@ impl Project {
         let dirs: Vec<&str> = root_dir.split("/").collect();
         let name = match dirs.last() {
             Some(name) => *name,
-            None => throw_error(
-                ErrorType::CREATION,
-                "Failed to get name of the root directory",
-                None,
-            ),
+            None => todo!(),
         };
         Self {
             root_dir: root_dir.to_string(),
@@ -44,7 +40,7 @@ impl Project {
     }
 
     pub fn create(&self) {
-        // Rooot dir
+        // Root dir
         self.create_root_dir(&self.name);
 
         // Git repo
@@ -67,11 +63,7 @@ impl Project {
     fn create_root_dir(&self, name: &str) {
         match fs::create_dir(&self.name) {
             Ok(()) => (),
-            Err(err) => throw_error(
-    ErrorType::CREATION,
-         &format!("Failed to create `{}` directory. Please report this on https://github.com/Thepigcat76/surtur/issues", name),
-         Some(format!("{}", err))
-            ),
+            Err(err) => todo!(),
         }
     }
 
@@ -107,43 +99,27 @@ impl Project {
     pub fn create_main_file(root_dir: &str) {
         let mut main_file = match File::create(format!("{}/src/main.c", root_dir)) {
             Ok(file) => file,
-            Err(err) => throw_error(
-    ErrorType::CREATION,
-         "Failed to create main file directory. Please report this on https://github.com/Thepigcat76/surtur/issues",
-         Some(format!("{}", err))
-            ),
+            Err(err) => todo!(),
         };
 
         // write content to main file
         match main_file
             .write_all(MAIN_FILE_LAYOUT.as_bytes()) {
                 Ok(file) => file,
-                Err(err) => throw_error(
-        ErrorType::CREATION,
-             "Failed to write content to main file. Please report this on https://github.com/Thepigcat76/surtur/issues",
-             Some(format!("{}", err))
-                ),
+                Err(err) => todo!(),
             };
     }
 
     pub fn create_cfg_file(root_dir: &str, root_name: &str) {
         let mut config_file = match File::create(format!("{}/project.lua", root_dir)) {
             Ok(file) => file,
-            Err(err) => throw_error(
-         ErrorType::CREATION,
-         "Failed to create config file. Please report this on https://github.com/Thepigcat76/surtur/issues",
-         Some(format!("{}", err))
-            ),
+            Err(err) => todo!(),
         };
 
         // Write content to cfg file
         match config_file.write_all(Self::get_cfg_file_layout(&root_name).as_bytes()) {
                 Ok(()) => (),
-                Err(err) => throw_error(
-        ErrorType::CREATION,
-             "Failed to write content to cfg file. Please report this on https://github.com/Thepigcat76/surtur/issues",
-             Some(format!("{}", err))
-                ),
+                Err(err) => todo!(),
             }
     }
 }

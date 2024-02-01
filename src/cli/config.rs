@@ -4,9 +4,10 @@
 
 use clutils::files::FileHandler;
 use rlua::{Lua, Table, Value};
+use strum::IntoEnumIterator;
 
-use crate::{
-    compiler::{Compiler, Standard},
+use super::{
+    compiler::Standard,
     deps::{Dependency, DepManager},
 };
 
@@ -22,8 +23,8 @@ impl ConfigFile {
         let mut c_std_str = String::new();
         let mut proj_version = String::new();
 
-        let stds = Compiler::get_standards();
-        let mut c_std: Option<&Standard> = None;
+        let stds: Vec<Standard> = Standard::iter().collect();
+        let mut c_std: Option<Standard> = None;
 
         let lua = Lua::new();
 
@@ -89,18 +90,18 @@ impl ConfigFile {
         });
 
         // version selection
-        stds.iter().for_each(|(key, val)| {
-            if &c_std_str == val {
-                c_std = Some(key);
+        for std in stds {
+            if c_std_str == std.to_string() {
+                c_std = Some(std);
+                break;
             }
-        });
-
-        if c_std == None {
-            panic!("Invalid C Standard: {:?}", c_std_str)
         }
 
         Self {
-            c_std: *c_std.unwrap(),
+            c_std: match c_std {
+                Some(std) => std,
+                None => panic!("Invalid C Standard: {:?}", c_std_str),
+            },
             proj_version,
             dependencies: DepManager::new(dependencies),
         }

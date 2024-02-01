@@ -1,0 +1,6 @@
+Error: Expected an argument after new
+
+surtur new
+           ^
+           Missing name for the new project
+           Example: `surtur new example-package`

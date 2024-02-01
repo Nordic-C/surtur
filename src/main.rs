@@ -1,15 +1,16 @@
-use cli::Cli;
+use colored::Colorize;
+use error::throw;
 
-mod cli;
-mod compiler;
-mod config;
-mod creator;
-mod deps;
-mod initiator;
-mod macros;
-mod tips;
-mod util;
+pub mod cli;
+pub mod error;
+pub mod util;
 
 fn main() {
-    Cli::new().execute();
+    throw(
+        "Command is invalid. Cannot find a command with the name `testing`".into(),
+        "Cannot find a command by the name `testing`, did you mean `test`?".into(),
+        format!("surtur {}", "testing".bright_red()),
+        7,
+        7,
+    );
 }

@@ -1,17 +1,23 @@
 /// Handling of commands, arguments.
-/// Interacts with config module to
+/// Also interacts with config module to
 /// gather/store configuration.
+pub mod compiler;
+pub mod config;
+pub mod creator;
+pub mod deps;
+pub mod initiator;
+
 use std::{collections::HashMap, env, path::PathBuf};
 
 use clap::{arg, command, value_parser, ArgMatches, Command as CCommand};
 use clutils::{files::FileHandler, map};
 
-use crate::{
+use crate::subcommand;
+
+use self::{
     compiler::{executor, CompType},
     config::ConfigFile,
     creator::Project,
-    initiator, subcommand,
-    util::{throw_error, ErrorType},
 };
 
 const INTRO: &str = r#"
@@ -37,22 +43,12 @@ impl Cli {
     pub fn new() -> Self {
         let cur_dir = match env::current_dir() {
             Ok(dir) => dir,
-            Err(_) => throw_error(
-                ErrorType::MISC,
-                "Failed to get current directory.
-        Please report this issue here https://github.com/Thepigcat76/surtur/issues",
-                None,
-            ),
+            Err(_) => todo!(),
         };
 
         let cur_dir = match cur_dir.to_str() {
             Some(cur_dir) => cur_dir.to_string(),
-            None => throw_error(
-                ErrorType::MISC,
-                "Failed to convert current directory to string.
-        Please report this issue here https://github.com/Thepigcat76/surtur/issues",
-                None,
-            ),
+            None => todo!(),
         };
 
         let path = format!("{}/project.lua", cur_dir,);
@@ -62,12 +58,10 @@ impl Cli {
             Err(_) => None,
         };
 
-        Self {
-            cfg,
-            cur_dir,
-        }
+        Self { cfg, cur_dir }
     }
 
+    // TODO: add this back
     pub fn get_cmd_tips(&self) -> HashMap<&str, &str> {
         map! [
             "uninstall" => "remove",
@@ -93,7 +87,6 @@ impl Cli {
                 initiator::init_proj(&Project::new(&self.cur_dir))
             }
             m if m.subcommand_matches("dbg-deps").is_some() => {
-
                 let config = self.cfg.as_ref().expect("Failed to get config file");
 
                 let dep_manager = &config.dependencies;
@@ -115,7 +108,7 @@ impl Cli {
                         Please report this issue on github and give additional context: https://github.com/Thepigcat76/surtur/issues"),
                 }
             }
-            _ => println!("{}", INTRO)
+            _ => println!("{}", INTRO),
         }
     }
 

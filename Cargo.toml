@@ -9,3 +9,4 @@ clutils = "0.0.8"
 colored = "2.0.4"
 git2 = "0.18.1"
 rlua = "0.19.7"
+strum = { version = "0.26.1", features = ["derive"] }

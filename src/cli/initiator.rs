@@ -8,7 +8,7 @@
 
 use std::fs;
 
-use crate::creator::Project;
+use super::creator::Project;
 
 pub fn init_proj(proj: &Project) {
     let cfg_file = format!("{}/project.lua", proj.root_dir);
