@@ -27,10 +27,9 @@ The most important commands are:
 - new <name> // create a new surtur C project
 - run // compiles and executes your program
 - build // compiles your program
-- help // use for additional help
 - add <name> // adds the specified library
 - remove <name> // removes the specified library
-- update // use this when making changes to the project.lua file
+- dbg-deps // Exists only for debugging and testing dependencies
 - init // initialize a surtur C project
 "#;
 
