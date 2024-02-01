@@ -4,3 +4,12 @@ surtur new
            ^
            Missing name for the new project
            Example: `surtur new example-package`
+
+
+    throw(
+        "Command is invalid. Cannot find a command with the name `testing`".into(),
+        "Cannot find a command by the name `testing`, did you mean `test`?".into(),
+        format!("surtur {}", "testing".bright_red()),
+        7,
+        7,
+    );

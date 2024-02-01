@@ -48,7 +48,7 @@ impl Dependency {
     }
 
     pub fn get_name(&self) -> String {
-        let split_path: Vec<&str> = self.origin.split("/").collect();
+        let split_path: Vec<&str> = self.origin.split('/').collect();
         let mut name = match split_path.last() {
             Some(name) => name.to_string(),
             None => panic!("Invalid origin {}", self.origin),
@@ -81,7 +81,7 @@ impl DepManager {
             }
         };
         let url = &dep.origin;
-        if let Err(err) = Repository::clone(url, &format!("deps/{}", dep.get_name())) {
+        if let Err(err) = Repository::clone(url, format!("deps/{}", dep.get_name())) {
             eprintln!("{}", err)
         }
         Ok(())

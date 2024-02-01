@@ -35,12 +35,12 @@ The most important commands are:
 "#;
 
 pub struct Cli {
-    pub cfg: Option<ConfigFile>,
+    pub cfg: ConfigFile,
     pub cur_dir: String,
 }
 
-impl Cli {
-    pub fn new() -> Self {
+impl Default for Cli {
+    fn default() -> Self {
         let cur_dir = match env::current_dir() {
             Ok(dir) => dir,
             Err(_) => todo!(),
@@ -54,13 +54,15 @@ impl Cli {
         let path = format!("{}/project.lua", cur_dir,);
 
         let cfg = match FileHandler::new(&path) {
-            Ok(fh) => Some(ConfigFile::from(fh)),
-            Err(_) => None,
+            Ok(fh) => ConfigFile::from(fh),
+            Err(_) => panic!("Could not find config file (project.lua"),
         };
 
         Self { cfg, cur_dir }
     }
+}
 
+impl Cli {
     // TODO: add this back
     pub fn get_cmd_tips(&self) -> HashMap<&str, &str> {
         map! [
@@ -81,29 +83,37 @@ impl Cli {
         match Self::handle_cmd() {
             m if m.subcommand_matches("run").is_some() => executor::run_c(self, false),
             m if m.subcommand_matches("build").is_some() => {
-                executor::build_c(self, CompType::Exe, false, false)
+                let name = m.subcommand_matches("build").unwrap();
+                executor::build_c(
+                    self,
+                    match name {
+                        n if n.get_flag("obj") => CompType::Obj,
+                        n if n.get_flag("asm") => CompType::Asm,
+                        n if n.get_flag("exe") => CompType::Exe,
+                        _ => CompType::Exe,
+                    },
+                    false,
+                    false,
+                )
             }
             m if m.subcommand_matches("init").is_some() => {
                 initiator::init_proj(&Project::new(&self.cur_dir))
             }
             m if m.subcommand_matches("dbg-deps").is_some() => {
-                let config = self.cfg.as_ref().expect("Failed to get config file");
-
-                let dep_manager = &config.dependencies;
+                let dep_manager = &self.cfg.dependencies;
                 dep_manager.init_dep_dir();
                 dep_manager.get_dep(0).expect("Failed to get dependency 0");
                 dep_manager.get_dep(1).expect("Failed to get dependency 1");
             }
             // Switch this to if let guards once they are stabelized
             m if m.subcommand_matches("new").is_some() => {
+                let cmd = m.subcommand_matches("new").unwrap();
                 // Unwrap is safe because of .is_some() check
-                let name = m
-                    .subcommand_matches("new")
-                    .unwrap()
-                    .get_one::<PathBuf>("NAME");
+                let name = cmd.get_one::<PathBuf>("NAME");
+                let is_lib = cmd.get_flag("lib");
 
                 match name {
-                    Some(name) => Project::new(&name.display().to_string()).create(),
+                    Some(name) => Project::new(&name.display().to_string()).create(is_lib),
                     None => eprintln!("Failed to create project because of issues with the NAME argument.
                         Please report this issue on github and give additional context: https://github.com/Thepigcat76/surtur/issues"),
                 }
@@ -143,7 +153,7 @@ impl Cli {
                 "new",
                 "create a new project",
                 arg!(<NAME> "name for the project")
-            ))
+            ).arg(arg!(-l --lib "Mark the project as a library")))
             .subcommand(CCommand::new("dbg-deps").about("Only exists for debugging dependencies. // TODO: remove this"))
             .get_matches()
     }

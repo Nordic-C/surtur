@@ -1,11 +1,12 @@
 /// Provides various utility functions
 
 pub mod macros;
+pub mod error;
 
 use std::fs;
 
 pub fn root_dir_name(cur_dir: &str) -> &str {
-    let dirs: Vec<&str> = cur_dir.split("/").collect();
+    let dirs: Vec<&str> = cur_dir.split('/').collect();
     dirs.last().unwrap_or_else(|| panic!("Failed to get current dir. Provided dir: {} is invalid", cur_dir))
 }
 
