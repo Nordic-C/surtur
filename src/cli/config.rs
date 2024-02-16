@@ -37,10 +37,6 @@ impl Display for ProjType {
     }
 }
 
-const MISSING_VER: &str = concat!(
-    "The projects version is missing.",
-            "This value needs to be declared in your project.lua file in the Props table with the name `version`\n Example: Props = {{ version = \"0.1\" }}");
-
 impl ConfigFile {
     pub fn from(file: FileHandler) -> Self {
         let mut dependencies: Vec<Dependency> = Vec::new();
@@ -53,22 +49,23 @@ impl ConfigFile {
         let mut c_std: Option<Standard> = None;
 
         let lua = Lua::new();
+        lua.load(&file.content)
+            .exec()
+            .expect("Failed to load context");
 
-        lua.context(|ctx| {
-            ctx.load(&file.content)
-                .exec()
-                .expect("Failed to load context");
+        // dependencies
+        let dep_table: Table = lua
+            .globals()
+            .get("Dependencies")
+            .expect("Failed to get dependencies");
 
-            // dependencies
-            let dep_table: Table = ctx
-                .globals()
-                .get("Dependencies")
-                .expect("Failed to get dependencies");
+        // versions
+        let props_table: Table = lua
+            .globals()
+            .get("Props")
+            .expect("Failed to get properties");
 
-            // versions
-            let props_table: Table = ctx.globals().get("Props").expect("Failed to get properties");
-
-            props_table
+        props_table
                 .pairs::<String, String>()
                 .for_each(|pair| {
                     let (key, val) = pair.expect("Failed to get pair");
@@ -87,36 +84,35 @@ impl ConfigFile {
                     }
                 });
 
-            // Iterating over dependencies
-            for dep in dep_table.sequence_values::<Table>() {
-                let mut version = 0.0;
-                let mut origin = String::new();
-                for pair in dep.expect("Failed to get table").sequence_values::<Value>() {
-                    match pair.expect("Failed to get dependency pair") {
-                        Value::Integer(int_value) => {
-                            version = int_value as f64;
-                        }
-                        Value::String(string_value) => {
-                            let origin_lit = string_value
-                                .to_str()
-                                .expect("Failed to convert to str")
-                                .to_string();
+        // Iterating over dependencies
+        for dep in dep_table.sequence_values::<Table>() {
+            let mut version = 0.0;
+            let mut origin = String::new();
+            for pair in dep.expect("Failed to get table").sequence_values::<Value>() {
+                match pair.expect("Failed to get dependency pair") {
+                    Value::Integer(int_value) => {
+                        version = int_value as f64;
+                    }
+                    Value::String(string_value) => {
+                        let origin_lit = string_value
+                            .to_str()
+                            .expect("Failed to convert to str")
+                            .to_string();
 
-                            origin = origin_lit;
-                        }
-                        Value::Number(num_value) => {
-                            version = num_value;
-                        }
-                        _ => {
-                            panic!()
-                        }
+                        origin = origin_lit;
+                    }
+                    Value::Number(num_value) => {
+                        version = num_value;
+                    }
+                    _ => {
+                        panic!()
                     }
                 }
-                let dependency = Dependency::new(&origin, version as f32);
-                dependencies.push(dependency);
-                println!("{:?}", dependencies);
             }
-        });
+            let dependency = Dependency::new(&origin, version as f32);
+            dependencies.push(dependency);
+            println!("{:?}", dependencies);
+        }
 
         // version selection
         for std in stds {

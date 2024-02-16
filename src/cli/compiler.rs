@@ -3,9 +3,8 @@
 /// building, running, linking and bundling libraries.
 use std::{
     fmt::Display,
-    fs, io,
-    path::PathBuf,
-    process::{Command, ExitStatus},
+    fs, path::PathBuf,
+    process::Command,
 };
 
 use crate::util;
@@ -75,13 +74,7 @@ impl Compiler {
         }
     }
 
-    pub fn build(
-        &mut self,
-        comp_type: CompType,
-        enable_dbg: bool,
-        is_release: bool,
-    ) -> io::Result<ExitStatus> {
-        dbg!("{}", &self.cmd);
+    pub fn build(&mut self, comp_type: CompType, enable_dbg: bool, is_release: bool) {
         let standard = format!("-std={}", self.std);
         let program = &mut self.cmd;
         let mut src_files = Vec::new();
@@ -119,8 +112,9 @@ impl Compiler {
         }
         .arg(standard);
 
-        let status = program.status()?;
-        Ok(status)
+        program
+            .status()
+            .unwrap_or_else(|err| panic!("Failed to compile program: {}", err));
     }
 }
 
@@ -130,7 +124,7 @@ impl Compiler {
 pub mod executor {
     use std::{
         fs,
-        process::{Command, ExitStatus},
+        process::Command,
     };
 
     use crate::{
@@ -159,12 +153,7 @@ pub mod executor {
         }
     }
 
-    pub fn build_c(
-        cli: Cli,
-        comp_type: CompType,
-        enable_dbg: bool,
-        is_release: bool,
-    ) -> ExitStatus {
+    pub fn build_c(cli: Cli, comp_type: CompType, enable_dbg: bool, is_release: bool) {
         let cfg = cli.cfg.unwrap_or_else(|| panic!("{}", MISSING_CFG));
         let mut compiler = Compiler::new(&cli.cur_dir, cfg);
 
@@ -184,8 +173,6 @@ pub mod executor {
                 }
             }
         }
-        compiler
-            .build(comp_type, enable_dbg, is_release)
-            .expect("Failed to build project")
+        compiler.build(comp_type, enable_dbg, is_release);
     }
 }
