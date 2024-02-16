@@ -12,6 +12,8 @@ use super::{
     deps::{DepManager, Dependency},
 };
 
+const DEFAULT_COMPILER: &str = "gcc";
+
 pub struct ConfigFile {
     pub c_std: Standard,
     pub proj_version: String,
@@ -44,6 +46,7 @@ impl ConfigFile {
         let mut c_std_str = String::from("c17");
         let mut proj_version = None;
         let mut proj_type = ProjType::Lib;
+        let mut compiler = String::from(DEFAULT_COMPILER);
 
         let stds: Vec<Standard> = Standard::iter().collect();
         let mut c_std: Option<Standard> = None;
@@ -62,7 +65,7 @@ impl ConfigFile {
                 .expect("Failed to get dependencies");
 
             // versions
-            let props_table: Table = ctx.globals().get("Props").expect("Failed to get versions");
+            let props_table: Table = ctx.globals().get("Props").expect("Failed to get properties");
 
             props_table
                 .pairs::<String, String>()
@@ -71,6 +74,7 @@ impl ConfigFile {
                     match key.to_lowercase().as_str() {
                         "std" => c_std_str = val,
                         "version" => proj_version = Some(val),
+                        "compiler" => compiler = val,
                         "type" => {
                             proj_type = match val.as_str() {
                                 "lib" => ProjType::Lib,

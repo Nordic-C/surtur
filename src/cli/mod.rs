@@ -12,7 +12,7 @@ use std::{collections::HashMap, env, path::PathBuf};
 use clap::{arg, command, value_parser, ArgMatches, Command as CCommand};
 use clutils::{files::FileHandler, map};
 
-use crate::subcommand;
+use crate::{subcommand, util::MISSING_CFG};
 
 use self::{
     compiler::{executor, CompType},
@@ -34,7 +34,7 @@ The most important commands are:
 "#;
 
 pub struct Cli {
-    pub cfg: ConfigFile,
+    pub cfg: Option<ConfigFile>,
     pub cur_dir: String,
 }
 
@@ -53,8 +53,8 @@ impl Default for Cli {
         let path = format!("{}/project.lua", cur_dir,);
 
         let cfg = match FileHandler::new(&path) {
-            Ok(fh) => ConfigFile::from(fh),
-            Err(_) => panic!("Could not find config file (project.lua"),
+            Ok(fh) => Some(ConfigFile::from(fh)),
+            Err(_) => None,
         };
 
         Self { cfg, cur_dir }
@@ -93,13 +93,13 @@ impl Cli {
                     },
                     false,
                     false,
-                )
+                );
             }
             m if m.subcommand_matches("init").is_some() => {
                 initiator::init_proj(&Project::new(&self.cur_dir))
             }
             m if m.subcommand_matches("dbg-deps").is_some() => {
-                let dep_manager = &self.cfg.dependencies;
+                let dep_manager = &self.cfg.as_ref().unwrap_or_else(|| panic!("{}", MISSING_CFG)).dependencies;
                 dep_manager.init_dep_dir();
                 dep_manager.get_dep(0).expect("Failed to get dependency 0");
                 dep_manager.get_dep(1).expect("Failed to get dependency 1");
