@@ -2,19 +2,18 @@
 /// This inclues functions for
 /// building, running, linking and bundling libraries.
 use std::{
-    fmt::Display, fs, io, path::PathBuf, process::{Command, ExitStatus}
+    fmt::Display,
+    fs, io,
+    path::PathBuf,
+    process::{Command, ExitStatus},
 };
 
 use crate::util;
 
-use super::{config::ProjType, deps::DepManager};
-
-pub struct Compiler {
-    command: Command,
-    deps: DepManager,
-    root_dir: PathBuf,
-    root_name: String,
-}
+use super::{
+    config::{ConfigFile, ProjType},
+    deps::DepManager,
+};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, strum::EnumIter)]
 pub enum Standard {
@@ -53,14 +52,24 @@ pub enum CompType {
     Obj,
 }
 
+pub struct Compiler {
+    cmd: Command,
+    deps: DepManager,
+    std: Standard,
+    proj_type: ProjType,
+    root_dir: PathBuf,
+    root_name: String,
+}
+
 impl Compiler {
-    pub fn new(cur_dir: &str, proj_type: &ProjType) -> Self {
+    pub fn new(cur_dir: &str, cfg: ConfigFile) -> Self {
         let root_name = util::root_dir_name(cur_dir);
-        let deps = Vec::new();
-        let command = Command::new("gcc");
+        let command = Command::new(cfg.compiler);
         Self {
-            command,
-            deps: DepManager::new(deps),
+            cmd: command,
+            deps: cfg.deps,
+            proj_type: cfg.proj_type,
+            std: cfg.c_std,
             root_dir: cur_dir.into(),
             root_name: root_name.into(),
         }
@@ -69,12 +78,12 @@ impl Compiler {
     pub fn build(
         &mut self,
         comp_type: CompType,
-        std: Standard,
         enable_dbg: bool,
         is_release: bool,
     ) -> io::Result<ExitStatus> {
-        let standard = format!("-std={}", std);
-        let program = &mut self.command;
+        dbg!("{}", &self.cmd);
+        let standard = format!("-std={}", self.std);
+        let program = &mut self.cmd;
         let mut src_files = Vec::new();
         if let Ok(entries) = fs::read_dir(format!("{}/src", self.root_dir.display())) {
             for file in entries.flatten() {
@@ -94,7 +103,11 @@ impl Compiler {
 
         match comp_type {
             // TODO: linux && macOS file ending
-            CompType::Exe => program.args(src_files).arg("-o").arg(&format!("{}/build/{}", self.root_dir.display(), self.root_name)),
+            CompType::Exe => program.args(src_files).arg("-o").arg(&format!(
+                "{}/build/{}",
+                self.root_dir.display(),
+                self.root_name
+            )),
             CompType::Asm => program
                 .arg("-S")
                 .args(src_files)
@@ -116,7 +129,8 @@ impl Compiler {
 /// everything
 pub mod executor {
     use std::{
-        fs, process::{Command, ExitStatus},
+        fs,
+        process::{Command, ExitStatus},
     };
 
     use crate::{
@@ -126,7 +140,7 @@ pub mod executor {
 
     use super::{CompType, Compiler};
 
-    pub fn run_c(cli: &Cli, enable_dbg: bool) {
+    pub fn run_c(cli: Cli, enable_dbg: bool) {
         let root_name = util::root_dir_name(&cli.cur_dir);
         let executable_path = format!("./build/{}", root_name);
 
@@ -146,18 +160,13 @@ pub mod executor {
     }
 
     pub fn build_c(
-        cli: &Cli,
+        cli: Cli,
         comp_type: CompType,
         enable_dbg: bool,
         is_release: bool,
     ) -> ExitStatus {
-        let mut compiler = Compiler::new(
-            &cli.cur_dir,
-            &cli.cfg
-                .as_ref()
-                .unwrap_or_else(|| panic!("{}", MISSING_CFG))
-                .proj_type,
-        );
+        let cfg = cli.cfg.unwrap_or_else(|| panic!("{}", MISSING_CFG));
+        let mut compiler = Compiler::new(&cli.cur_dir, cfg);
 
         let root_name = util::root_dir_name(&cli.cur_dir);
         let executable_path = format!("./build/{}", root_name);
@@ -176,15 +185,7 @@ pub mod executor {
             }
         }
         compiler
-            .build(
-                comp_type,
-                cli.cfg
-                    .as_ref()
-                    .unwrap_or_else(|| panic!("{}", MISSING_CFG))
-                    .c_std,
-                enable_dbg,
-                is_release,
-            )
+            .build(comp_type, enable_dbg, is_release)
             .expect("Failed to build project")
     }
 }

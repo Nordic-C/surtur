@@ -74,11 +74,11 @@ impl Cli {
         ]
     }
 
-    pub fn execute(&self) {
+    pub fn execute(self) {
         self.match_args()
     }
 
-    fn match_args(&self) {
+    fn match_args(self) {
         match Self::handle_cmd() {
             m if m.subcommand_matches("run").is_some() => executor::run_c(self, false),
             m if m.subcommand_matches("build").is_some() => {
@@ -99,7 +99,7 @@ impl Cli {
                 initiator::init_proj(&Project::new(&self.cur_dir))
             }
             m if m.subcommand_matches("dbg-deps").is_some() => {
-                let dep_manager = &self.cfg.as_ref().unwrap_or_else(|| panic!("{}", MISSING_CFG)).dependencies;
+                let dep_manager = &self.cfg.as_ref().unwrap_or_else(|| panic!("{}", MISSING_CFG)).deps;
                 dep_manager.init_dep_dir();
                 dep_manager.get_dep(0).expect("Failed to get dependency 0");
                 dep_manager.get_dep(1).expect("Failed to get dependency 1");

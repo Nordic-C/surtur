@@ -15,13 +15,14 @@ use super::{
 const DEFAULT_COMPILER: &str = "gcc";
 
 pub struct ConfigFile {
+    pub compiler: String,
     pub c_std: Standard,
     pub proj_version: String,
     pub proj_type: ProjType,
-    pub dependencies: DepManager,
+    pub deps: DepManager,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum ProjType {
     Lib,
     Bin,
@@ -126,12 +127,13 @@ impl ConfigFile {
         }
 
         Self {
+            compiler,
             c_std: match c_std {
                 Some(std) => std,
                 None => panic!("Invalid C Standard: {:?}", c_std_str),
             },
             proj_version: proj_version.unwrap_or_else(|| panic!()),
-            dependencies: DepManager::new(dependencies),
+            deps: DepManager::new(dependencies),
             proj_type,
         }
     }
