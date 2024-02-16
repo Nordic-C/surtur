@@ -22,7 +22,7 @@ pub struct DepManager {
 
 #[derive(Debug)]
 pub struct Dependency {
-    version: f32,
+    _version: f32,
     origin: String,
 }
 
@@ -42,7 +42,7 @@ impl Dependency {
             _ => origin.to_string(),
         };
         Self {
-            version,
+            _version: version,
             origin,
         }
     }

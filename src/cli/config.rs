@@ -59,7 +59,7 @@ impl ConfigFile {
             .get("Dependencies")
             .expect("Failed to get dependencies");
 
-        // versions
+        // properties
         let props_table: Table = lua
             .globals()
             .get("Props")

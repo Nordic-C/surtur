@@ -103,20 +103,20 @@ impl Project {
         // write content to main file
         match main_file.write_all(MAIN_FILE_LAYOUT.as_bytes()) {
             Ok(file) => file,
-            Err(err) => todo!(),
+            Err(_) => todo!(),
         }
     }
 
     pub fn create_cfg_file(root_dir: &str, root_name: &str, lib: bool) {
         let mut config_file = match File::create(format!("{}/project.lua", root_dir)) {
             Ok(file) => file,
-            Err(err) => todo!(),
+            Err(_) => todo!(),
         };
 
         // Write content to cfg file
         match config_file.write_all(Self::get_cfg_file_layout(root_name, lib).as_bytes()) {
             Ok(()) => (),
-            Err(err) => todo!(),
+            Err(_) => todo!(),
         }
     }
 }

@@ -2,7 +2,7 @@ pub mod error;
 /// Provides various utility functions
 pub mod macros;
 
-use std::{fs, path::PathBuf};
+use std::{fs, io::empty, path::PathBuf};
 
 pub const MISSING_CFG: &str = "Failed to find the project's config file (project.lua)";
 
@@ -23,15 +23,24 @@ pub fn create_dir(dir: &str) {
     }
 }
 
-pub fn traverse_path(path: &PathBuf, files: &mut Vec<PathBuf>) {
+pub fn get_src_files(path: &PathBuf) -> Vec<PathBuf> {
     let dir = fs::read_dir(path)
         .unwrap_or_else(|_| panic!("Failed to find directory: {}", path.display()));
-    for entry in dir.flatten() {
-        let file_type = entry.file_type().expect("Failed to get file type");
-        if file_type.is_dir() {
-            traverse_path(&entry.path(), files);
-        } else {
-            files.push(entry.path())
-        }
-    }
+    dir.flatten()
+        .map(|entry| {
+            let file_type = entry.file_type().expect("Failed to get file type");
+            if file_type.is_dir() {
+                get_src_files(&entry.path())
+            } else {
+                let file_name = entry.file_name().to_string_lossy().to_string();
+                let file_ending = &file_name[file_name.len() - 2..];
+                if file_ending == ".c" {
+                    vec![entry.path()]
+                } else {
+                    vec![]
+                }
+            }
+        })
+        .flatten()
+        .collect()
 }

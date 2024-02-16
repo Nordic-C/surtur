@@ -77,16 +77,7 @@ impl Compiler {
     pub fn build(&mut self, comp_type: CompType, enable_dbg: bool, is_release: bool) {
         let standard = format!("-std={}", self.std);
         let program = &mut self.cmd;
-        let mut src_files = Vec::new();
-        if let Ok(entries) = fs::read_dir(format!("{}/src", self.root_dir.display())) {
-            for file in entries.flatten() {
-                let name = file.file_name().to_string_lossy().to_string();
-                let ending = &name[name.len() - 2..];
-                if ending == ".c" {
-                    src_files.push(format!("{}/src/{}", self.root_dir.display(), name))
-                }
-            }
-        }
+        let src_files = util::get_src_files(&format!("{}/src", self.root_dir.display()).into());
 
         if enable_dbg {
             program.arg("-g");
