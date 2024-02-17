@@ -1,11 +1,7 @@
 /// Handling of building and running the c program with gcc.
 /// This inclues functions for
 /// building, running, linking and bundling libraries.
-use std::{
-    fmt::Display,
-    fs, path::PathBuf,
-    process::Command,
-};
+use std::{fmt::Display, path::PathBuf, process::Command};
 
 use crate::util;
 
@@ -52,32 +48,39 @@ pub enum CompType {
 }
 
 pub struct Compiler {
-    cmd: Command,
+    cmd: String,
     deps: DepManager,
     std: Standard,
     proj_type: ProjType,
-    root_dir: PathBuf,
+    proj_dir: PathBuf,
     root_name: String,
 }
 
 impl Compiler {
     pub fn new(cur_dir: &str, cfg: ConfigFile) -> Self {
         let root_name = util::root_dir_name(cur_dir);
-        let command = Command::new(cfg.compiler);
         Self {
-            cmd: command,
+            cmd: cfg.compiler,
             deps: cfg.deps,
             proj_type: cfg.proj_type,
             std: cfg.c_std,
-            root_dir: cur_dir.into(),
+            proj_dir: cur_dir.into(),
             root_name: root_name.into(),
         }
     }
 
-    pub fn build(&mut self, comp_type: CompType, enable_dbg: bool, is_release: bool) {
+    pub fn build(
+        &self,
+        root_dir: &PathBuf,
+        out_dir: &PathBuf,
+        out_name: String,
+        comp_type: CompType,
+        enable_dbg: bool,
+        is_release: bool,
+    ) {
         let standard = format!("-std={}", self.std);
-        let program = &mut self.cmd;
-        let src_files = util::get_src_files(&format!("{}/src", self.root_dir.display()).into());
+        let mut program = Command::new(&self.cmd);
+        let src_files = util::get_src_files(&format!("{}/src", root_dir.display()).into());
 
         if enable_dbg {
             program.arg("-g");
@@ -87,19 +90,19 @@ impl Compiler {
 
         match comp_type {
             // TODO: linux && macOS file ending
-            CompType::Exe => program.args(src_files).arg("-o").arg(&format!(
-                "{}/build/{}",
-                self.root_dir.display(),
-                self.root_name
+            CompType::Exe => program.args(src_files).arg("-o").arg(format!(
+                "{}/{}",
+                out_dir.display(),
+                out_name
             )),
             CompType::Asm => program
                 .arg("-S")
                 .args(src_files)
-                .current_dir(format!("{}/build", self.root_dir.display())),
+                .current_dir(format!("{}/build", self.proj_dir.display())),
             CompType::Obj => program
                 .arg("-c")
                 .args(src_files)
-                .current_dir(format!("{}/build", self.root_dir.display())),
+                .current_dir(format!("{}/build", self.proj_dir.display())),
         }
         .arg(standard);
 
@@ -107,16 +110,30 @@ impl Compiler {
             .status()
             .unwrap_or_else(|err| panic!("Failed to compile program: {}", err));
     }
+
+    fn build_deps(&self) {
+        let deps = self.deps.dep_locations();
+        for (index, dep) in deps.iter().enumerate() {
+            let out_dir = format!("{}/build", &self.proj_dir.display());
+            let name = self.deps.deps.get(index).unwrap().name();
+            dbg!("name: {}", &name);
+            self.build(
+                &dep,
+                &out_dir.into(),
+                name,
+                CompType::Exe,
+                false,
+                false,
+            );
+        }
+    }
 }
 
 /// This module provides wrappings around
 /// the Compiler for easily running and building
 /// everything
 pub mod executor {
-    use std::{
-        fs,
-        process::Command,
-    };
+    use std::{env, fs, path::PathBuf, process::Command};
 
     use crate::{
         cli::Cli,
@@ -146,17 +163,18 @@ pub mod executor {
 
     pub fn build_c(cli: Cli, comp_type: CompType, enable_dbg: bool, is_release: bool) {
         let cfg = cli.cfg.unwrap_or_else(|| panic!("{}", MISSING_CFG));
-        let mut compiler = Compiler::new(&cli.cur_dir, cfg);
+        let compiler = Compiler::new(&cli.cur_dir, cfg);
 
         let root_name = util::root_dir_name(&cli.cur_dir);
         let executable_path = format!("./build/{}", root_name);
+
+        compiler.build_deps();
 
         match fs::metadata(&executable_path) {
             Ok(_) => {
                 let mut program = Command::new("rm");
                 let cmd = program.arg(&executable_path);
-                let mut child = cmd.spawn().expect("Failed to spawn child");
-                child.wait().expect("Failed to get exitstatus");
+                cmd.status().expect("Failed to spawn child");
             }
             Err(_) => {
                 if fs::metadata("./build").is_err() {
@@ -164,6 +182,13 @@ pub mod executor {
                 }
             }
         }
-        compiler.build(comp_type, enable_dbg, is_release);
+        compiler.build(
+            &env::current_dir().unwrap_or_else(|err| panic!("Failed to get cur dir: {}", err)),
+            &PathBuf::from("build"),
+            root_name.into(),
+            comp_type,
+            enable_dbg,
+            is_release,
+        );
     }
 }

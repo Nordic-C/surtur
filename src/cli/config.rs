@@ -111,7 +111,6 @@ impl ConfigFile {
             }
             let dependency = Dependency::new(&origin, version as f32);
             dependencies.push(dependency);
-            println!("{:?}", dependencies);
         }
 
         // version selection

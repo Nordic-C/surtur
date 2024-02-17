@@ -43,12 +43,9 @@ impl Default for Cli {
         let cur_dir = match env::current_dir() {
             Ok(dir) => dir,
             Err(_) => todo!(),
-        };
-
-        let cur_dir = match cur_dir.to_str() {
-            Some(cur_dir) => cur_dir.to_string(),
-            None => todo!(),
-        };
+        }
+        .to_string_lossy()
+        .to_string();
 
         let path = format!("{}/project.lua", cur_dir,);
 
@@ -99,10 +96,13 @@ impl Cli {
                 initiator::init_proj(&Project::new(&self.cur_dir))
             }
             m if m.subcommand_matches("dbg-deps").is_some() => {
-                let dep_manager = &self.cfg.as_ref().unwrap_or_else(|| panic!("{}", MISSING_CFG)).deps;
+                let dep_manager = &self
+                    .cfg
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("{}", MISSING_CFG))
+                    .deps;
                 dep_manager.init_dep_dir();
-                dep_manager.get_dep(0).expect("Failed to get dependency 0");
-                dep_manager.get_dep(1).expect("Failed to get dependency 1");
+                dep_manager.download_deps();
             }
             // Switch this to if let guards once they are stabelized
             m if m.subcommand_matches("new").is_some() => {

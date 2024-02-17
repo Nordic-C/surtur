@@ -4,12 +4,11 @@
 /// for managing the dependencies of your
 /// project. It stores all of your project's
 /// dependencies.
-/// 
+///
 /// Individula dependencies are in the Dependency
 /// struct and store basic information about the
 /// specific dependency
-
-use std::{error::Error, fmt::Display};
+use std::{error::Error, fmt::Display, path::PathBuf};
 
 use git2::Repository;
 
@@ -17,7 +16,7 @@ use crate::util;
 
 #[derive(Debug, Default)]
 pub struct DepManager {
-    dependencies: Vec<Dependency>,
+    pub deps: Vec<Dependency>,
 }
 
 #[derive(Debug)]
@@ -26,43 +25,9 @@ pub struct Dependency {
     origin: String,
 }
 
-impl Dependency {
-    pub fn new(origin: &str, version: f32) -> Self {
-        let origin = origin.to_string();
-        let split_path: Vec<&str> = origin.split('.').collect();
-        let origin = match split_path.last() {
-            Some(last) => match *last {
-                "git" => origin.to_string(),
-                _ => {
-                    let mut origin = origin.to_string();
-                    origin.push_str(".git");
-                    origin
-                }
-            }
-            _ => origin.to_string(),
-        };
-        Self {
-            _version: version,
-            origin,
-        }
-    }
-
-    pub fn get_name(&self) -> String {
-        let split_path: Vec<&str> = self.origin.split('/').collect();
-        let mut name = match split_path.last() {
-            Some(name) => name.to_string(),
-            None => panic!("Invalid origin {}", self.origin),
-        };
-        for _ in 0..=3 {
-            name.pop();
-        }
-        name
-    }
-}
-
 impl DepManager {
     pub fn new(dependencies: Vec<Dependency>) -> Self {
-        Self { dependencies }
+        Self { deps: dependencies }
     }
 
     pub fn init_dep_dir(&self) {
@@ -70,21 +35,43 @@ impl DepManager {
     }
 
     /// Downloads the dependency into your projects depndency directoy
-    pub fn get_dep(&self, index: usize) -> Result<(), impl Error> {
-        let dep = match self.dependencies.get(index) {
-            Some(dep) => dep,
-            None => {
-                return Err(NoDepError(format!(
-                    "The dependency at index: {} is out of bounds",
-                    index
-                )))
+    pub fn download_deps(&self) {
+        for dep in &self.deps {
+            let url = &dep.origin;
+            if let Err(err) = Repository::clone(url, format!("deps/{}", dep.name())) {
+                eprintln!("{}", err)
+            }
+        }
+    }
+
+    pub fn dep_locations(&self) -> Vec<PathBuf> {
+        self.deps.iter().map(|dep| format!("deps/{}", dep.name()).into()).collect()
+    }
+}
+
+impl Dependency {
+    pub fn new(origin: &str, version: f32) -> Self {
+        let origin = match &origin[origin.len() - 4..] {
+            ".git" => origin.to_string(),
+            _ => {
+                let mut origin = origin.to_string();
+                origin.push_str(".git");
+                origin
             }
         };
-        let url = &dep.origin;
-        if let Err(err) = Repository::clone(url, format!("deps/{}", dep.get_name())) {
-            eprintln!("{}", err)
+        Self {
+            _version: version,
+            origin,
         }
-        Ok(())
+    }
+
+    pub fn name(&self) -> String {
+        let split_path: Vec<&str> = self.origin.split('/').collect();
+        let mut name = match split_path.last() {
+            Some(name) => name.to_string(),
+            None => panic!("Invalid origin {}", self.origin),
+        };
+        name[..name.len() - 4].into()
     }
 }
 

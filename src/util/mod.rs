@@ -2,7 +2,7 @@ pub mod error;
 /// Provides various utility functions
 pub mod macros;
 
-use std::{fs, io::empty, path::PathBuf};
+use std::{fs, path::PathBuf};
 
 pub const MISSING_CFG: &str = "Failed to find the project's config file (project.lua)";
 
