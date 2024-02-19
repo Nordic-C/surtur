@@ -3,14 +3,11 @@
 /// the main.c file and the project.lua config.
 /// In addition to that there are also are helper
 /// functions for creating all directories and files
-use std::{
-    fs:: File,
-    io::Write,
-};
+use std::{fs::File, io::Write};
 
 use git2::{Repository, RepositoryInitOptions};
 
-use crate::util;
+use crate::util::{self, DEFAULT_COMPILER};
 
 #[derive(Debug)]
 pub struct Project {
@@ -75,12 +72,14 @@ impl Project {
     fn get_cfg_file_layout(name: &str, lib: bool) -> String {
         format!(
             concat!(
-                "\n-- versioning\n",
+                "-- properties\n",
                 "Name = \"{}\"\n",
-                "Versions = {{\n",
+                "Props = {{\n",
                 "    std = \"c17\",\n",
                 "    version = \"0.1\",\n",
-                "    type = \"{}\"\n",
+                "    type = \"{}\",\n",
+                "    compiler = \"{}\",\n",
+                "    tests = false,\n",
                 "}}\n",
                 "\n-- external dependents\n",
                 "Dependencies = {{\n",
@@ -88,7 +87,8 @@ impl Project {
                 "}}\n"
             ),
             name,
-            if lib { "lib" } else { "bin" }
+            if lib { "lib" } else { "bin" },
+            DEFAULT_COMPILER
         )
     }
 

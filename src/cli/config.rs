@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashSet, fmt::Display};
 
 /// Handling of the project's lua config file.
 /// It includes the lua parser and all information
@@ -7,12 +7,12 @@ use clutils::files::FileHandler;
 use rlua::{Lua, Table, Value};
 use strum::IntoEnumIterator;
 
+use crate::util::DEFAULT_COMPILER;
+
 use super::{
     compiler::Standard,
-    deps::{DepManager, Dependency},
+    deps::{DepManager, Dependency}
 };
-
-const DEFAULT_COMPILER: &str = "gcc";
 
 pub struct ConfigFile {
     pub compiler: String,
@@ -39,7 +39,7 @@ impl Display for ProjType {
 
 impl ConfigFile {
     pub fn from(file: FileHandler) -> Self {
-        let mut dependencies: Vec<Dependency> = Vec::new();
+        let mut dependencies = HashSet::new();
         let mut c_std_str = String::from("c17");
         let mut proj_version = None;
         let mut proj_type = ProjType::Lib;
@@ -49,6 +49,10 @@ impl ConfigFile {
         let mut c_std: Option<Standard> = None;
 
         let lua = Lua::new();
+        //let function = lua.create_function(builtins::run_script).expect("Failed to create function");
+
+        //lua.globals().set("run_cmd", function).expect("Failed to set global function: \"run_cmd\"");
+
         lua.load(&file.content)
             .exec()
             .expect("Failed to load context");
@@ -109,8 +113,8 @@ impl ConfigFile {
                     }
                 }
             }
-            let dependency = Dependency::new(&origin, version as f32);
-            dependencies.push(dependency);
+            let dependency = Dependency::new(&origin, &version.to_string());
+            dependencies.insert(dependency);
         }
 
         // version selection

@@ -1,7 +1,7 @@
 /// Handling of building and running the c program with gcc.
 /// This inclues functions for
 /// building, running, linking and bundling libraries.
-use std::{fmt::Display, path::PathBuf, process::Command};
+use std::{fmt::Display, fs, path::PathBuf, process::Command};
 
 use crate::util;
 
@@ -81,6 +81,20 @@ impl Compiler {
         let standard = format!("-std={}", self.std);
         let mut program = Command::new(&self.cmd);
         let src_files = util::get_src_files(&format!("{}/src", root_dir.display()).into());
+        let header_files = util::get_header_files(&format!("{}/src", root_dir.display()).into());
+
+        let mut final_src_files = Vec::new();
+        for file in src_files {
+            let src_name = file.to_string_lossy().to_string();
+            let header_name = src_name.replace(".c", ".h");
+            let src_name = src_name.split('/').collect::<Vec<&str>>();
+            let src_name = src_name
+                .last()
+                .unwrap_or_else(|| panic!("Path: {} is invalid", file.display()));
+            if header_files.contains(&PathBuf::from(header_name)) || *src_name == "main.c" {
+                final_src_files.push(file);
+            }
+        }
 
         if enable_dbg {
             program.arg("-g");
@@ -90,18 +104,18 @@ impl Compiler {
 
         match comp_type {
             // TODO: linux && macOS file ending
-            CompType::Exe => program.args(src_files).arg("-o").arg(format!(
+            CompType::Exe => program.args(final_src_files).arg("-o").arg(format!(
                 "{}/{}",
                 out_dir.display(),
                 out_name
             )),
             CompType::Asm => program
                 .arg("-S")
-                .args(src_files)
+                .args(final_src_files)
                 .current_dir(format!("{}/build", self.proj_dir.display())),
             CompType::Obj => program
                 .arg("-c")
-                .args(src_files)
+                .args(final_src_files)
                 .current_dir(format!("{}/build", self.proj_dir.display())),
         }
         .arg(standard);
@@ -111,20 +125,56 @@ impl Compiler {
             .unwrap_or_else(|err| panic!("Failed to compile program: {}", err));
     }
 
+    fn build_lib(&self, root_dir: &PathBuf, out_dir: &PathBuf, out_name: String) {
+        let standard = format!("-std={}", self.std);
+        let src_files = util::get_src_files(&format!("{}/src", root_dir.display()).into());
+        let mut out_names = Vec::new();
+
+        for file in src_files {
+            let mut program = Command::new(&self.cmd);
+            let name = file
+                .to_string_lossy()
+                .to_string()
+                .split('/')
+                .last()
+                .unwrap_or_else(|| panic!("Invalid src file path: {}", file.display()))
+                .to_string();
+            let out_path = format!("build/{}o", &name[..name.len() - 1]);
+            program
+                .arg("-c")
+                .arg(&file)
+                .arg("-o")
+                .arg(&out_path)
+                .arg(&standard);
+            program
+                .spawn()
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Failed to compile src file: {}, error: {}",
+                        &file.display(),
+                        err
+                    )
+                })
+                .wait()
+                .expect("Failed to wait lol");
+            out_names.push(out_path);
+        }
+        let mut linker = Command::new("ar");
+        linker
+            .arg("rcs")
+            .arg(format!("build/{}.a", out_name))
+            .args(out_names);
+        linker.spawn().expect("Failed to link library");
+    }
+
+    fn link_lib() {}
+
     fn build_deps(&self) {
-        let deps = self.deps.dep_locations();
-        for (index, dep) in deps.iter().enumerate() {
+        for dep in &self.deps.deps {
             let out_dir = format!("{}/build", &self.proj_dir.display());
-            let name = self.deps.deps.get(index).unwrap().name();
+            let name = self.deps.deps.get(dep).unwrap().name();
             dbg!("name: {}", &name);
-            self.build(
-                &dep,
-                &out_dir.into(),
-                name,
-                CompType::Exe,
-                false,
-                false,
-            );
+            self.build_lib(&dep.location(), &out_dir.into(), name);
         }
     }
 }
@@ -168,20 +218,12 @@ pub mod executor {
         let root_name = util::root_dir_name(&cli.cur_dir);
         let executable_path = format!("./build/{}", root_name);
 
+        if fs::metadata("./build").is_err() {
+            fs::create_dir("./build").expect("Failed to create build directory")
+        }
+
         compiler.build_deps();
 
-        match fs::metadata(&executable_path) {
-            Ok(_) => {
-                let mut program = Command::new("rm");
-                let cmd = program.arg(&executable_path);
-                cmd.status().expect("Failed to spawn child");
-            }
-            Err(_) => {
-                if fs::metadata("./build").is_err() {
-                    fs::create_dir("./build").expect("Failed to create build directory")
-                }
-            }
-        }
         compiler.build(
             &env::current_dir().unwrap_or_else(|err| panic!("Failed to get cur dir: {}", err)),
             &PathBuf::from("build"),

@@ -8,7 +8,7 @@
 /// Individula dependencies are in the Dependency
 /// struct and store basic information about the
 /// specific dependency
-use std::{error::Error, fmt::Display, path::PathBuf};
+use std::{collections::HashSet, error::Error, fmt::Display, path::PathBuf};
 
 use git2::Repository;
 
@@ -16,17 +16,17 @@ use crate::util;
 
 #[derive(Debug, Default)]
 pub struct DepManager {
-    pub deps: Vec<Dependency>,
+    pub deps: HashSet<Dependency>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Dependency {
-    _version: f32,
+    _version: String,
     origin: String,
 }
 
 impl DepManager {
-    pub fn new(dependencies: Vec<Dependency>) -> Self {
+    pub fn new(dependencies: HashSet<Dependency>) -> Self {
         Self { deps: dependencies }
     }
 
@@ -43,14 +43,10 @@ impl DepManager {
             }
         }
     }
-
-    pub fn dep_locations(&self) -> Vec<PathBuf> {
-        self.deps.iter().map(|dep| format!("deps/{}", dep.name()).into()).collect()
-    }
 }
 
 impl Dependency {
-    pub fn new(origin: &str, version: f32) -> Self {
+    pub fn new(origin: &str, version: &str) -> Self {
         let origin = match &origin[origin.len() - 4..] {
             ".git" => origin.to_string(),
             _ => {
@@ -60,7 +56,7 @@ impl Dependency {
             }
         };
         Self {
-            _version: version,
+            _version: version.into(),
             origin,
         }
     }
@@ -72,6 +68,10 @@ impl Dependency {
             None => panic!("Invalid origin {}", self.origin),
         };
         name[..name.len() - 4].into()
+    }
+
+    pub fn location(&self) -> PathBuf {
+        format!("deps/{}", self.name()).into()
     }
 }
 
