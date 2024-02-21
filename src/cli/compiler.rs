@@ -83,7 +83,8 @@ impl Compiler {
         let src_files = util::get_src_files(&format!("{}/src", root_dir.display()).into());
         let header_files = util::get_header_files(&format!("{}/src", root_dir.display()).into());
 
-        let mut final_src_files = Vec::new();
+        let mut final_src_files = src_files;
+        /*
         for file in src_files {
             let src_name = file.to_string_lossy().to_string();
             let header_name = src_name.replace(".c", ".h");
@@ -95,6 +96,7 @@ impl Compiler {
                 final_src_files.push(file);
             }
         }
+        */
 
         if enable_dbg {
             program.arg("-g");

@@ -22,6 +22,8 @@ int main(void) {
 }
 "#;
 
+const GITIGNORE_LAYOUT: &str = r#"build/"#;
+
 impl Project {
     pub fn new(root_dir: &str) -> Self {
         let dirs: Vec<&str> = root_dir.split('/').collect();
@@ -44,6 +46,9 @@ impl Project {
 
         // Source dir
         self.create_dir("src");
+
+        // .gitignore file
+        Self::create_gitignore(&self.root_dir);
 
         // Cfg file
         Self::create_cfg_file(&self.root_dir, &self.name, is_lib);
@@ -102,7 +107,7 @@ impl Project {
 
         // write content to main file
         match main_file.write_all(MAIN_FILE_LAYOUT.as_bytes()) {
-            Ok(file) => file,
+            Ok(_) => (),
             Err(_) => todo!(),
         }
     }
@@ -115,7 +120,19 @@ impl Project {
 
         // Write content to cfg file
         match config_file.write_all(Self::get_cfg_file_layout(root_name, lib).as_bytes()) {
-            Ok(()) => (),
+            Ok(_) => (),
+            Err(_) => todo!(),
+        }
+    }
+
+    pub fn create_gitignore(root_dir: &str) {
+        let mut gitignore_file = match File::create(format!("{}/.gitignore", root_dir)) {
+            Ok(file) => file,
+            Err(_) => todo!(),
+        };
+
+        match gitignore_file.write_all(GITIGNORE_LAYOUT.as_bytes()) {
+            Ok(_) => (),
             Err(_) => todo!(),
         }
     }
