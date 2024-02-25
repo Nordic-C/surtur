@@ -15,7 +15,7 @@ use clutils::{files::FileHandler, map};
 use crate::{subcommand, util::MISSING_CFG};
 
 use self::{
-    compiler::{executor, CompType},
+    compiler::{CompType, executor},
     config::ConfigFile,
     creator::Project,
 };
@@ -71,6 +71,7 @@ impl Cli {
         ]
     }
 
+    #[inline]
     pub fn execute(self) {
         self.match_args()
     }
@@ -79,44 +80,15 @@ impl Cli {
         match Self::handle_cmd() {
             m if m.subcommand_matches("run").is_some() => executor::run_c(self, false),
             m if m.subcommand_matches("build").is_some() => {
-                let name = m.subcommand_matches("build").unwrap();
-                executor::build_c(
-                    self,
-                    match name {
-                        n if n.get_flag("obj") => CompType::Obj,
-                        n if n.get_flag("asm") => CompType::Asm,
-                        n if n.get_flag("exe") => CompType::Exe,
-                        _ => CompType::Exe,
-                    },
-                    false,
-                    false,
-                );
+                executor::build_c(self, CompType::Exe, false, false)
             }
             m if m.subcommand_matches("init").is_some() => {
                 initiator::init_proj(&Project::new(&self.cur_dir))
             }
-            m if m.subcommand_matches("dbg-deps").is_some() => {
-                let dep_manager = &self
-                    .cfg
-                    .as_ref()
-                    .unwrap_or_else(|| panic!("{}", MISSING_CFG))
-                    .deps;
-                dep_manager.init_dep_dir();
-                dep_manager.download_deps();
-            }
+            m if m.subcommand_matches("test").is_some() => self.run_test(m),
+            m if m.subcommand_matches("dbg-deps").is_some() => self.dbg_deps(),
             // Switch this to if let guards once they are stabelized
-            m if m.subcommand_matches("new").is_some() => {
-                let cmd = m.subcommand_matches("new").unwrap();
-                // Unwrap is safe because of .is_some() check
-                let name = cmd.get_one::<PathBuf>("NAME");
-                let is_lib = cmd.get_flag("lib");
-
-                match name {
-                    Some(name) => Project::new(&name.display().to_string()).create(is_lib),
-                    None => eprintln!("Failed to create project because of issues with the NAME argument.
-                        Please report this issue on github and give additional context: https://github.com/Thepigcat76/surtur/issues"),
-                }
-            }
+            m if m.subcommand_matches("new").is_some() => Self::new_proj(m),
             _ => println!("{}", INTRO),
         }
     }
@@ -128,15 +100,17 @@ impl Cli {
             .subcommand(
                 CCommand::new("build")
                     .about("Build the project into a library or executable")
-                    .arg(arg!(-s --asm "Compile the program to assembly").required(false))
-                    .arg(arg!(-o --obj "Compile the program to an object file").required(false))
-                    .arg(
-                        arg!(-x --exe "Compile the program to an exectuable (default)").required(false),
-                    )
                     .arg(
                         arg!(-r --release "Compile the program in release mode (better optimization)")
                             .required(false),
+                    )
+                    .arg(
+                        arg!(-d --debug "Compile the program in debug mode (more advanced debugging capabilities)")
+                            .required(false),
                     ),
+            ).subcommand(
+                subcommand!("test", "Run a specific or all tests",
+                arg!(<NAME> "Specify a test name").required(false))
             )
             .subcommand(subcommand!(
                 "add",
@@ -155,5 +129,37 @@ impl Cli {
             ).arg(arg!(-l --lib "Mark the project as a library")))
             .subcommand(CCommand::new("dbg-deps").about("Only exists for debugging dependencies. // TODO: remove this"))
             .get_matches()
+    }
+
+    fn run_test(self, m: ArgMatches) {
+        let cmd = m.subcommand_matches("test").unwrap();
+        let tests = cmd.get_one::<PathBuf>("NAME");
+        executor::run_test(self, &match tests {
+            Some(tests) => tests.to_string_lossy().to_string(),
+            None => "*".into(),
+        });
+    }
+
+    fn dbg_deps(&self) {
+        let dep_manager = &self
+            .cfg
+            .as_ref()
+            .unwrap_or_else(|| panic!("{}", MISSING_CFG))
+            .deps;
+        dep_manager.init_dep_dir();
+        dep_manager.download_deps();
+    }
+
+    fn new_proj(m: ArgMatches) {
+        let cmd = m.subcommand_matches("new").unwrap();
+        // Unwrap is safe because of .is_some() check
+        let name = cmd.get_one::<PathBuf>("NAME");
+        let is_lib = cmd.get_flag("lib");
+
+        match name {
+                    Some(name) => Project::new(&name.display().to_string()).create(is_lib),
+                    None => eprintln!("Failed to create project because of issues with the NAME argument.
+                        Please report this issue on github and give additional context: https://github.com/Thepigcat76/surtur/issues"),
+        }
     }
 }

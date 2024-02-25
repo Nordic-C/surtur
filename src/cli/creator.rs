@@ -85,15 +85,22 @@ impl Project {
                 "    type = \"{}\",\n",
                 "    compiler = \"{}\",\n",
                 "    tests = false,\n",
-                "}}\n",
-                "\n-- external dependents\n",
+                "}}\n\n",
+                "-- C files that should not be compiled manually (don't have a header)\n",
+                "{}",
+                "\n-- external dependenciess\n",
                 "Dependencies = {{\n",
                 "    -- {{ \"dependency_name\", 0.1 }}\n",
                 "}}\n"
             ),
             name,
             if lib { "lib" } else { "bin" },
-            DEFAULT_COMPILER
+            DEFAULT_COMPILER,
+            if lib {
+                "\n-- lib.c is excluded here if your project is a library\nExclude = {\n    \"lib.c\",\n}\n"
+            } else {
+                ""
+            }
         )
     }
 

@@ -1,15 +1,11 @@
-#include <assert.h>
-#include <stdio.h>
-#include "test.c"
-
-void test();
+#include "tests/tests.h"
 
 int main(void) {
+  TEST(my_test, {
+    ASSERT(100 == 100);
+  });
 
-  void (*functions[])() = {test};
-  functions[0]();
-  printf("Hello, World! test\n");
-  assert(10 == 100);
+  TEST(my_second_test, { ASSERT(100 == 100); });
+
+  TEST(my_third_test, { ASSERT(10 == 10); });
 }
-
-void test() { printf("Testing\n"); }

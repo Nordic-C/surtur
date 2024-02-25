@@ -4,7 +4,7 @@ Props = {
     std = "c17",
     version = "0.1",
     type = "bin",
-    compiler = "gcc"
+    compiler = "clang"
 }
 
 -- Excludes files from being compiled.
@@ -12,13 +12,14 @@ Props = {
 
 -- relative to the src directory
 Exclude = {
-    "test.c"
+    "test.c",
+    "name.c"
 }
 
 -- relative to the src directory
 
--- default is main.c
-Entry = "main.c"
+-- default is main.c for bin and lib.c for lib projects
+Entry = "lib.c"
 
 -- external dependents
 Dependencies = {

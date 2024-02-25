@@ -1,17 +1,17 @@
-use std::{collections::HashSet, fmt::Display};
+use std::{collections::HashSet, fmt::Display, path::PathBuf};
 
 /// Handling of the project's lua config file.
 /// It includes the lua parser and all information
 /// related to the project's configuration
 use clutils::files::FileHandler;
-use rlua::{Lua, Table, Value};
+use rlua::{Lua, Result, Table, Value};
 use strum::IntoEnumIterator;
 
 use crate::util::DEFAULT_COMPILER;
 
 use super::{
     compiler::Standard,
-    deps::{DepManager, Dependency}
+    deps::{DepManager, Dependency},
 };
 
 pub struct ConfigFile {
@@ -20,6 +20,8 @@ pub struct ConfigFile {
     pub proj_version: String,
     pub proj_type: ProjType,
     pub deps: DepManager,
+    pub entry: PathBuf,
+    pub excluded: Vec<PathBuf>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -44,6 +46,8 @@ impl ConfigFile {
         let mut proj_version = None;
         let mut proj_type = ProjType::Lib;
         let mut compiler = String::from(DEFAULT_COMPILER);
+        let entry: String;
+        let mut excluded_vec: Vec<PathBuf> = vec![];
 
         let stds: Vec<Standard> = Standard::iter().collect();
         let mut c_std: Option<Standard> = None;
@@ -69,6 +73,13 @@ impl ConfigFile {
             .get("Props")
             .expect("Failed to get properties");
 
+        entry = lua.globals().get("Entry").unwrap_or(match proj_type {
+            ProjType::Lib => "lib.c",
+            ProjType::Bin => "main.c",
+        }.into());
+
+        let excluded: Result<Table> = lua.globals().get("Exclude");
+
         props_table
                 .pairs::<String, String>()
                 .for_each(|pair| {
@@ -87,6 +98,18 @@ impl ConfigFile {
                         key => panic!("invalid version entry: {}", key),
                     }
                 });
+
+        match excluded {
+            Ok(table) => {
+                for elem in table.pairs::<u64, String>() {
+                    match elem {
+                        Ok(elem) => excluded_vec.push(elem.1.into()),
+                        Err(_) => (),
+                    }
+                }
+            }
+            Err(_) => (),
+        }
 
         // Iterating over dependencies
         for dep in dep_table.sequence_values::<Table>() {
@@ -134,6 +157,8 @@ impl ConfigFile {
             proj_version: proj_version.unwrap_or_else(|| panic!()),
             deps: DepManager::new(dependencies),
             proj_type,
+            entry: entry.into(),
+            excluded: excluded_vec,
         }
     }
 }

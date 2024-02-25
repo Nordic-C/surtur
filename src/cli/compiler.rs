@@ -1,7 +1,7 @@
 /// Handling of building and running the c program with gcc.
 /// This inclues functions for
 /// building, running, linking and bundling libraries.
-use std::{fmt::Display, fs, path::PathBuf, process::Command};
+use std::{fmt::Display, path::PathBuf, process::Command};
 
 use crate::util;
 
@@ -43,8 +43,8 @@ impl Display for Standard {
 
 pub enum CompType {
     Exe,
-    Asm,
-    Obj,
+    //Asm,
+    //Obj,
 }
 
 pub struct Compiler {
@@ -81,22 +81,6 @@ impl Compiler {
         let standard = format!("-std={}", self.std);
         let mut program = Command::new(&self.cmd);
         let src_files = util::get_src_files(&format!("{}/src", root_dir.display()).into());
-        let header_files = util::get_header_files(&format!("{}/src", root_dir.display()).into());
-
-        let mut final_src_files = src_files;
-        /*
-        for file in src_files {
-            let src_name = file.to_string_lossy().to_string();
-            let header_name = src_name.replace(".c", ".h");
-            let src_name = src_name.split('/').collect::<Vec<&str>>();
-            let src_name = src_name
-                .last()
-                .unwrap_or_else(|| panic!("Path: {} is invalid", file.display()));
-            if header_files.contains(&PathBuf::from(header_name)) || *src_name == "main.c" {
-                final_src_files.push(file);
-            }
-        }
-        */
 
         if enable_dbg {
             program.arg("-g");
@@ -106,19 +90,11 @@ impl Compiler {
 
         match comp_type {
             // TODO: linux && macOS file ending
-            CompType::Exe => program.args(final_src_files).arg("-o").arg(format!(
-                "{}/{}",
-                out_dir.display(),
-                out_name
-            )),
-            CompType::Asm => program
-                .arg("-S")
-                .args(final_src_files)
-                .current_dir(format!("{}/build", self.proj_dir.display())),
-            CompType::Obj => program
-                .arg("-c")
-                .args(final_src_files)
-                .current_dir(format!("{}/build", self.proj_dir.display())),
+            CompType::Exe => program
+                .args(src_files)
+                .arg("-o")
+                .arg(format!("{}/{}", out_dir.display(), out_name))
+                .arg("-DNOTESTS"),
         }
         .arg(standard);
 
@@ -147,6 +123,7 @@ impl Compiler {
                 .arg(&file)
                 .arg("-o")
                 .arg(&out_path)
+                .arg("-DNOTESTS")
                 .arg(&standard);
             program
                 .spawn()
@@ -167,6 +144,24 @@ impl Compiler {
             .arg(format!("build/{}.a", out_name))
             .args(out_names);
         linker.spawn().expect("Failed to link library");
+    }
+
+    fn build_test(&self, root_dir: &PathBuf) {
+        let out_name = &self.root_name;
+        let out_dir = format!("{}/build/tests", root_dir.display());
+        let standard = format!("-std={}", self.std);
+        let mut program = Command::new(&self.cmd);
+        let src_files = util::get_src_files(&format!("{}/src", root_dir.display()).into());
+
+        program
+            .args(src_files)
+            .arg("-o")
+            .arg(format!("{}/{}", out_dir, out_name))
+            .arg(standard);
+
+        program
+            .status()
+            .unwrap_or_else(|err| panic!("Failed to compile program: {}", err));
     }
 
     fn link_lib() {}
@@ -218,7 +213,6 @@ pub mod executor {
         let compiler = Compiler::new(&cli.cur_dir, cfg);
 
         let root_name = util::root_dir_name(&cli.cur_dir);
-        let executable_path = format!("./build/{}", root_name);
 
         if fs::metadata("./build").is_err() {
             fs::create_dir("./build").expect("Failed to create build directory")
@@ -234,5 +228,23 @@ pub mod executor {
             enable_dbg,
             is_release,
         );
+    }
+
+    pub fn run_test(cli: Cli, tests: &String) {
+        let cfg = cli.cfg.unwrap_or_else(|| panic!("{}", MISSING_CFG));
+        let compiler = Compiler::new(&cli.cur_dir, cfg);
+
+        if fs::metadata("./build/tests").is_err() {
+            fs::create_dir("./build/tests").expect("Failed to create tests directory")
+        }
+
+        compiler.build_test(
+            &env::current_dir().unwrap_or_else(|err| panic!("Failed to get cur dir: {}", err)),
+        );
+
+        env::set_var("SURTUR_TESTS", tests);
+
+        let mut program = Command::new(format!("./build/tests/{}", compiler.root_name));
+        program.spawn().expect("Failed to run test");
     }
 }

@@ -63,7 +63,7 @@ impl Dependency {
 
     pub fn name(&self) -> String {
         let split_path: Vec<&str> = self.origin.split('/').collect();
-        let mut name = match split_path.last() {
+        let name = match split_path.last() {
             Some(name) => name.to_string(),
             None => panic!("Invalid origin {}", self.origin),
         };
