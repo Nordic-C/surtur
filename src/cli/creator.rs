@@ -84,7 +84,6 @@ impl Project {
                 "    version = \"0.1\",\n",
                 "    type = \"{}\",\n",
                 "    compiler = \"{}\",\n",
-                "    tests = false,\n",
                 "}}\n\n",
                 "-- C files that should not be compiled manually (don't have a header)\n",
                 "{}",

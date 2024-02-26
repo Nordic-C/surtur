@@ -98,6 +98,8 @@ impl Compiler {
         }
         .arg(standard);
 
+        self.link_lib(&mut program);
+
         program
             .status()
             .unwrap_or_else(|err| panic!("Failed to compile program: {}", err));
@@ -141,7 +143,7 @@ impl Compiler {
         let mut linker = Command::new("ar");
         linker
             .arg("rcs")
-            .arg(format!("build/{}.a", out_name))
+            .arg(format!("{}/{}.a", out_dir.display(), out_name))
             .args(out_names);
         linker.spawn().expect("Failed to link library");
     }
@@ -159,12 +161,19 @@ impl Compiler {
             .arg(format!("{}/{}", out_dir, out_name))
             .arg(standard);
 
+        self.link_lib(&mut program);
+
         program
             .status()
             .unwrap_or_else(|err| panic!("Failed to compile program: {}", err));
     }
 
-    fn link_lib() {}
+    fn link_lib(&self, cmd: &mut Command) {
+        cmd.arg("-Lbuild/");
+        for dep in &self.deps.deps {
+            cmd.arg(format!("-l:{}.a", dep.name()));
+        }
+    }
 
     fn build_deps(&self) {
         for dep in &self.deps.deps {

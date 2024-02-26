@@ -8,7 +8,7 @@
 /// Individula dependencies are in the Dependency
 /// struct and store basic information about the
 /// specific dependency
-use std::{collections::HashSet, error::Error, fmt::Display, path::PathBuf};
+use std::{collections::HashSet, error::Error, fmt::Display, fs, path::PathBuf};
 
 use git2::Repository;
 
@@ -31,7 +31,9 @@ impl DepManager {
     }
 
     pub fn init_dep_dir(&self) {
-        util::create_dir("deps");
+        if fs::metadata("deps").is_err() {
+            util::create_dir("deps");
+        }
     }
 
     /// Downloads the dependency into your projects depndency directoy
