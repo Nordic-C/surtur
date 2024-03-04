@@ -3,6 +3,7 @@ pub mod error;
 pub mod macros;
 
 use std::{fs, path::PathBuf};
+use std::error::Error;
 
 pub const MISSING_CFG: &str = "Failed to find the project's config file (project.lua)";
 
@@ -53,4 +54,11 @@ pub fn get_header_files(path: &PathBuf) -> Vec<PathBuf> {
 
 pub fn get_src_files(path: &PathBuf) -> Vec<PathBuf> {
     get_files(path, ".c")
+}
+
+pub fn result_to_option<T, E: Error>(res: Result<T, E>) -> Option<T> {
+    match res {
+        Ok(val) => Some(val),
+        Err(_) => None,
+    }
 }

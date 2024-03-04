@@ -14,7 +14,7 @@ use super::{
     deps::{DepManager, Dependency},
 };
 
-pub struct ConfigFile {
+pub struct Config {
     pub compiler: String,
     pub c_std: Standard,
     pub proj_version: String,
@@ -39,7 +39,7 @@ impl Display for ProjType {
     }
 }
 
-impl ConfigFile {
+impl Config {
     pub fn from(file: FileHandler) -> Self {
         let mut dependencies = HashSet::new();
         let mut c_std_str = String::from("c17");

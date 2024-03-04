@@ -79,7 +79,7 @@ impl Project {
             concat!(
                 "-- properties\n",
                 "Name = \"{}\"\n",
-                "Props = {{\n",
+                "Properties = {{\n",
                 "    std = \"c17\",\n",
                 "    version = \"0.1\",\n",
                 "    type = \"{}\",\n",

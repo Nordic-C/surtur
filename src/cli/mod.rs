@@ -16,7 +16,7 @@ use crate::{subcommand, util::MISSING_CFG};
 
 use self::{
     compiler::{CompType, executor},
-    config::ConfigFile,
+    config::Config,
     creator::Project,
 };
 
@@ -34,7 +34,7 @@ The most important commands are:
 "#;
 
 pub struct Cli {
-    pub cfg: Option<ConfigFile>,
+    pub cfg: Option<Config>,
     pub cur_dir: String,
 }
 
@@ -50,7 +50,7 @@ impl Default for Cli {
         let path = format!("{}/project.lua", cur_dir,);
 
         let cfg = match FileHandler::new(&path) {
-            Ok(fh) => Some(ConfigFile::from(fh)),
+            Ok(fh) => Some(Config::from(fh)),
             Err(_) => None,
         };
 

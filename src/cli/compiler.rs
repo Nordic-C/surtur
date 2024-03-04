@@ -6,7 +6,7 @@ use std::{fmt::Display, path::PathBuf, process::Command};
 use crate::util;
 
 use super::{
-    config::{ConfigFile, ProjType},
+    config::{Config, ProjType},
     deps::DepManager,
 };
 
@@ -57,7 +57,7 @@ pub struct Compiler {
 }
 
 impl Compiler {
-    pub fn new(cur_dir: &str, cfg: ConfigFile) -> Self {
+    pub fn new(cur_dir: &str, cfg: Config) -> Self {
         let root_name = util::root_dir_name(cur_dir);
         Self {
             cmd: cfg.compiler,
@@ -87,6 +87,8 @@ impl Compiler {
         } else if is_release {
             program.arg("-o3");
         }
+
+        program.arg("-I./deps");
 
         match comp_type {
             // TODO: linux && macOS file ending
@@ -122,11 +124,13 @@ impl Compiler {
             let out_path = format!("build/{}o", &name[..name.len() - 1]);
             program
                 .arg("-c")
+                .arg("-I./deps")
                 .arg(&file)
                 .arg("-o")
                 .arg(&out_path)
                 .arg("-DNOTESTS")
                 .arg(&standard);
+            dbg!("{:?}", &program);
             program
                 .spawn()
                 .unwrap_or_else(|err| {
