@@ -77,6 +77,7 @@ impl Compiler {
         comp_type: CompType,
         enable_dbg: bool,
         is_release: bool,
+        tests: bool,
     ) {
         let standard = format!("-std={}", self.std);
         let mut program = Command::new(&self.cmd);
@@ -90,15 +91,23 @@ impl Compiler {
 
         program.arg("-I./deps");
 
-        match comp_type {
+        let mut program = match comp_type {
             // TODO: linux && macOS file ending
-            CompType::Exe => program
-                .args(src_files)
-                .arg("-o")
-                .arg(format!("{}/{}", out_dir.display(), out_name))
-                .arg("-DNOTESTS"),
-        }
-        .arg(standard);
+            CompType::Exe => {
+                program.args(src_files).arg("-o").arg(format!(
+                    "{}/{}",
+                    out_dir.display(),
+                    out_name
+                ));
+                if !tests {
+                    program.arg("-DNOTESTS");
+                    dbg!("COMPILING WITH NO TESTS");
+                }
+                program
+            }
+        };
+
+        program.arg(standard);
 
         self.link_lib(&mut program);
 
@@ -128,9 +137,9 @@ impl Compiler {
                 .arg(&file)
                 .arg("-o")
                 .arg(&out_path)
+                .arg("-w")
                 .arg("-DNOTESTS")
                 .arg(&standard);
-            dbg!("{:?}", &program);
             program
                 .spawn()
                 .unwrap_or_else(|err| {
@@ -183,7 +192,6 @@ impl Compiler {
         for dep in &self.deps.deps {
             let out_dir = format!("{}/build", &self.proj_dir.display());
             let name = self.deps.deps.get(dep).unwrap().name();
-            dbg!("name: {}", &name);
             self.build_lib(&dep.location(), &out_dir.into(), name);
         }
     }
@@ -240,6 +248,7 @@ pub mod executor {
             comp_type,
             enable_dbg,
             is_release,
+            false,
         );
     }
 
@@ -247,17 +256,29 @@ pub mod executor {
         let cfg = cli.cfg.unwrap_or_else(|| panic!("{}", MISSING_CFG));
         let compiler = Compiler::new(&cli.cur_dir, cfg);
 
+        if fs::metadata("./build").is_err() {
+            fs::create_dir("./build").expect("Failed to create build directory")
+        }
+
         if fs::metadata("./build/tests").is_err() {
             fs::create_dir("./build/tests").expect("Failed to create tests directory")
         }
 
-        compiler.build_test(
+        compiler.build_deps();
+
+        compiler.build(
             &env::current_dir().unwrap_or_else(|err| panic!("Failed to get cur dir: {}", err)),
+            &PathBuf::from("build/tests"),
+            compiler.root_name.clone().into(),
+            CompType::Exe,
+            false,
+            false,
+            true,
         );
 
         env::set_var("SURTUR_TESTS", tests);
 
         let mut program = Command::new(format!("./build/tests/{}", compiler.root_name));
-        program.spawn().expect("Failed to run test");
+        program.spawn().unwrap_or_else(|err| panic!("{err}"));
     }
 }
