@@ -3,15 +3,19 @@
 /// the main.c file and the project.lua config.
 /// In addition to that there are also are helper
 /// functions for creating all directories and files
-use std::{fs::File, io::Write};
+use std::{
+    fs::File,
+    io::Write,
+    path::PathBuf,
+};
 
 use git2::{Repository, RepositoryInitOptions};
 
 use crate::util::{self, DEFAULT_COMPILER};
 
 #[derive(Debug)]
-pub struct Project {
-    pub root_dir: String,
+pub struct Project<'p> {
+    pub root_dir: &'p PathBuf,
     pub name: String,
 }
 
@@ -22,18 +26,14 @@ int main(void) {
 }
 "#;
 
-const GITIGNORE_LAYOUT: &str = r#"build/"#;
+const GITIGNORE_LAYOUT: &str = concat!("build/\n", "deps/\n");
 
-impl Project {
-    pub fn new(root_dir: &str) -> Self {
-        let dirs: Vec<&str> = root_dir.split('/').collect();
-        let name = match dirs.last() {
-            Some(name) => *name,
-            None => todo!(),
-        };
+impl<'p> Project<'p> {
+    pub fn new(root_dir: &'p PathBuf) -> Self {
+        let name = root_dir.file_name().unwrap().to_string_lossy().to_string();
         Self {
-            root_dir: root_dir.to_string(),
-            name: name.to_string(),
+            root_dir: root_dir,
+            name: name,
         }
     }
 
@@ -103,10 +103,10 @@ impl Project {
         )
     }
 
-    pub fn create_main_file(root_dir: &str, is_lib: bool) {
+    pub fn create_main_file(root_dir: &PathBuf, is_lib: bool) {
         let mut main_file = File::create(format!(
             "{}/src/{}.c",
-            root_dir,
+            root_dir.display(),
             if is_lib { "lib" } else { "main" }
         ))
         .unwrap_or_else(|err| panic!("Failed to create main file, error: {}", err));
@@ -118,8 +118,8 @@ impl Project {
         }
     }
 
-    pub fn create_cfg_file(root_dir: &str, root_name: &str, lib: bool) {
-        let mut config_file = match File::create(format!("{}/project.lua", root_dir)) {
+    pub fn create_cfg_file(root_dir: &PathBuf, root_name: &str, lib: bool) {
+        let mut config_file = match File::create(root_dir.join("project.lua")) {
             Ok(file) => file,
             Err(_) => todo!(),
         };
@@ -131,8 +131,8 @@ impl Project {
         }
     }
 
-    pub fn create_gitignore(root_dir: &str) {
-        let mut gitignore_file = match File::create(format!("{}/.gitignore", root_dir)) {
+    pub fn create_gitignore(root_dir: &PathBuf) {
+        let mut gitignore_file = match File::create(root_dir.join(".gitingore")) {
             Ok(file) => file,
             Err(_) => todo!(),
         };

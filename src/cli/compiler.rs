@@ -10,7 +10,7 @@ use super::{
     deps::DepManager,
 };
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, strum::EnumIter)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub enum Standard {
     C89,
     C99,
@@ -22,6 +22,23 @@ pub enum Standard {
     Gnu11,
     Gnu17,
     Gnu2X,
+}
+
+impl Standard {
+    pub fn all() -> [Standard; 10] {
+        [
+            Standard::C89,
+            Standard::C99,
+            Standard::C11,
+            Standard::C17,
+            Standard::C2X,
+            Standard::Gnu89,
+            Standard::Gnu99,
+            Standard::Gnu11,
+            Standard::Gnu17,
+            Standard::Gnu2X,
+        ]
+    }
 }
 
 impl Display for Standard {
@@ -47,25 +64,25 @@ pub enum CompType {
     //Obj,
 }
 
-pub struct Compiler {
+pub struct Compiler<'c> {
     cmd: String,
-    deps: DepManager,
+    dm: DepManager,
     std: Standard,
     proj_type: ProjType,
-    proj_dir: PathBuf,
-    root_name: String,
+    proj_dir: &'c PathBuf,
+    root_name: &'c str,
 }
 
-impl Compiler {
-    pub fn new(cur_dir: &str, cfg: Config) -> Self {
+impl<'c> Compiler<'c> {
+    pub fn new(cur_dir: &'c PathBuf, cfg: Config) -> Self {
         let root_name = util::root_dir_name(cur_dir);
         Self {
             cmd: cfg.compiler,
-            deps: cfg.deps,
+            dm: cfg.deps,
             proj_type: cfg.proj_type,
             std: cfg.c_std,
-            proj_dir: cur_dir.into(),
-            root_name: root_name.into(),
+            proj_dir: cur_dir,
+            root_name,
         }
     }
 
@@ -73,7 +90,25 @@ impl Compiler {
         &self,
         root_dir: &PathBuf,
         out_dir: &PathBuf,
-        out_name: String,
+        out_name: &str,
+        comp_type: CompType,
+        enable_dbg: bool,
+        is_release: bool,
+        tests: bool,
+    ) {
+        match self.proj_type {
+            ProjType::Lib => self.build_lib(root_dir, out_dir, out_name),
+            ProjType::Bin => self.build_exe(
+                root_dir, out_dir, out_name, comp_type, enable_dbg, is_release, tests,
+            ),
+        }
+    }
+
+    pub fn build_exe(
+        &self,
+        root_dir: &PathBuf,
+        out_dir: &PathBuf,
+        out_name: &str,
         comp_type: CompType,
         enable_dbg: bool,
         is_release: bool,
@@ -101,7 +136,6 @@ impl Compiler {
                 ));
                 if !tests {
                     program.arg("-DNOTESTS");
-                    dbg!("COMPILING WITH NO TESTS");
                 }
                 program
             }
@@ -116,7 +150,7 @@ impl Compiler {
             .unwrap_or_else(|err| panic!("Failed to compile program: {}", err));
     }
 
-    fn build_lib(&self, root_dir: &PathBuf, out_dir: &PathBuf, out_name: String) {
+    fn build_lib(&self, root_dir: &PathBuf, out_dir: &PathBuf, out_name: &str) {
         let standard = format!("-std={}", self.std);
         let src_files = util::get_src_files(&format!("{}/src", root_dir.display()).into());
         let mut out_names = Vec::new();
@@ -161,38 +195,18 @@ impl Compiler {
         linker.spawn().expect("Failed to link library");
     }
 
-    fn build_test(&self, root_dir: &PathBuf) {
-        let out_name = &self.root_name;
-        let out_dir = format!("{}/build/tests", root_dir.display());
-        let standard = format!("-std={}", self.std);
-        let mut program = Command::new(&self.cmd);
-        let src_files = util::get_src_files(&format!("{}/src", root_dir.display()).into());
-
-        program
-            .args(src_files)
-            .arg("-o")
-            .arg(format!("{}/{}", out_dir, out_name))
-            .arg(standard);
-
-        self.link_lib(&mut program);
-
-        program
-            .status()
-            .unwrap_or_else(|err| panic!("Failed to compile program: {}", err));
-    }
-
     fn link_lib(&self, cmd: &mut Command) {
         cmd.arg("-Lbuild/");
-        for dep in &self.deps.deps {
+        for dep in &self.dm.deps {
             cmd.arg(format!("-l:{}.a", dep.name()));
         }
     }
 
     fn build_deps(&self) {
-        for dep in &self.deps.deps {
+        for dep in &self.dm.deps {
             let out_dir = format!("{}/build", &self.proj_dir.display());
-            let name = self.deps.deps.get(dep).unwrap().name();
-            self.build_lib(&dep.location(), &out_dir.into(), name);
+            let name = self.dm.deps.get(dep).unwrap().name();
+            self.build_lib(&dep.location(), &out_dir.into(), &name);
         }
     }
 }
@@ -269,7 +283,7 @@ pub mod executor {
         compiler.build(
             &env::current_dir().unwrap_or_else(|err| panic!("Failed to get cur dir: {}", err)),
             &PathBuf::from("build/tests"),
-            compiler.root_name.clone().into(),
+            &compiler.root_name,
             CompType::Exe,
             false,
             false,

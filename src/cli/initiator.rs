@@ -11,8 +11,8 @@ use std::fs;
 use super::creator::Project;
 
 pub fn init_proj(proj: &Project) {
-    let cfg_file = format!("{}/project.lua", proj.root_dir);
-    let main_file = format!("{}/src/main.c", proj.root_dir);
+    let cfg_file = proj.root_dir.join("project.lua");
+    let main_file = proj.root_dir.join("src").join("main.c");
     if fs::metadata(cfg_file).is_err() {
         Project::create_cfg_file(&proj.root_dir, &proj.name, false);
     }

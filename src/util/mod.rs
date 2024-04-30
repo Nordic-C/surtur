@@ -9,14 +9,8 @@ pub const MISSING_CFG: &str = "Failed to find the project's config file (project
 
 pub const DEFAULT_COMPILER: &str = "gcc";
 
-pub fn root_dir_name(cur_dir: &str) -> &str {
-    let dirs: Vec<&str> = cur_dir.split('/').collect();
-    dirs.last().unwrap_or_else(|| {
-        panic!(
-            "Failed to get current dir. Provided dir: {} is invalid",
-            cur_dir
-        )
-    })
+pub fn root_dir_name(cur_dir: &PathBuf) -> &str {
+    cur_dir.file_name().unwrap().to_str().unwrap()
 }
 
 pub fn create_dir(dir: &str) {

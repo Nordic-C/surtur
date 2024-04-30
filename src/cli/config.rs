@@ -5,7 +5,6 @@ use std::{collections::HashSet, fmt::Display, path::PathBuf};
 /// related to the project's configuration
 use clutils::files::FileHandler;
 use rlua::{Lua, Result, Table, Value};
-use strum::IntoEnumIterator;
 
 use crate::util::DEFAULT_COMPILER;
 
@@ -40,7 +39,7 @@ impl Display for ProjType {
 }
 
 impl Config {
-    pub fn from(file: FileHandler) -> Self {
+    pub fn parse(file: FileHandler) -> Self {
         let mut dependencies = HashSet::new();
         let mut c_std_str = String::from("c17");
         let mut proj_version = None;
@@ -49,7 +48,7 @@ impl Config {
         let entry: String;
         let mut excluded_vec: Vec<PathBuf> = vec![];
 
-        let stds: Vec<Standard> = Standard::iter().collect();
+        let stds: [Standard; 10] = Standard::all();
         let mut c_std: Option<Standard> = None;
 
         let lua = Lua::new();
@@ -57,7 +56,7 @@ impl Config {
 
         //lua.globals().set("run_cmd", function).expect("Failed to set global function: \"run_cmd\"");
 
-        lua.load(&file.content)
+        lua.load(&file.file_content)
             .exec()
             .expect("Failed to load context");
 

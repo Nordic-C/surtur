@@ -15,7 +15,7 @@ use clutils::{files::FileHandler, map};
 use crate::{subcommand, util::MISSING_CFG};
 
 use self::{
-    compiler::{CompType, executor},
+    compiler::{executor, CompType},
     config::Config,
     creator::Project,
 };
@@ -35,7 +35,7 @@ The most important commands are:
 
 pub struct Cli {
     pub cfg: Option<Config>,
-    pub cur_dir: String,
+    pub cur_dir: PathBuf,
 }
 
 impl Default for Cli {
@@ -43,14 +43,12 @@ impl Default for Cli {
         let cur_dir = match env::current_dir() {
             Ok(dir) => dir,
             Err(_) => todo!(),
-        }
-        .to_string_lossy()
-        .to_string();
+        };
 
-        let path = format!("{}/project.lua", cur_dir,);
+        let path = cur_dir.join("project.lua");
 
         let cfg = match FileHandler::new(&path) {
-            Ok(fh) => Some(Config::from(fh)),
+            Ok(fh) => Some(Config::parse(fh)),
             Err(_) => None,
         };
 
@@ -134,10 +132,13 @@ impl Cli {
     fn run_test(self, m: ArgMatches) {
         let cmd = m.subcommand_matches("test").unwrap();
         let tests = cmd.get_one::<PathBuf>("NAME");
-        executor::run_test(self, &match tests {
-            Some(tests) => tests.to_string_lossy().to_string(),
-            None => "*".into(),
-        });
+        executor::run_test(
+            self,
+            &match tests {
+                Some(tests) => tests.to_string_lossy().to_string(),
+                None => "*".into(),
+            },
+        );
     }
 
     fn dbg_deps(&self) {
@@ -157,7 +158,7 @@ impl Cli {
         let is_lib = cmd.get_flag("lib");
 
         match name {
-                    Some(name) => Project::new(&name.display().to_string()).create(is_lib),
+                    Some(name) => Project::new(&name).create(is_lib),
                     None => eprintln!("Failed to create project because of issues with the NAME argument.
                         Please report this issue on github and give additional context: https://github.com/Thepigcat76/surtur/issues"),
         }
