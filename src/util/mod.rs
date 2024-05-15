@@ -1,25 +1,28 @@
 pub mod error;
 /// Provides various utility functions
 pub mod macros;
+pub mod files;
 
 use std::{fs, path::PathBuf};
 use std::error::Error;
+
+use anyhow::Context;
 
 pub const MISSING_CFG: &str = "Failed to find the project's config file (project.lua)";
 
 pub const DEFAULT_COMPILER: &str = "gcc";
 
-pub fn root_dir_name(cur_dir: &PathBuf) -> &str {
-    cur_dir.file_name().unwrap().to_str().unwrap()
+#[inline(always)]
+pub fn root_dir_name(cur_dir: &PathBuf) -> Option<&str> {
+    cur_dir.file_name()?.to_str()
 }
 
-pub fn create_dir(dir: &str) {
-    match fs::create_dir(dir) {
-        Ok(_) => (),
-        Err(err) => panic!("Failed to create dir: {}", err),
-    }
+#[inline(always)]
+pub fn create_dir(dir: &str) -> anyhow::Result<()> {
+    fs::create_dir(dir).context(format!("Failed to create directory: {}", dir))
 }
 
+// recursively go through directory
 pub fn get_files(path: &PathBuf, ending: &str) -> Vec<PathBuf> {
     let dir = fs::read_dir(path)
         .unwrap_or_else(|_| panic!("Failed to find directory: {}", path.display()));
@@ -42,10 +45,12 @@ pub fn get_files(path: &PathBuf, ending: &str) -> Vec<PathBuf> {
         .collect()
 }
 
+#[inline(always)]
 pub fn get_header_files(path: &PathBuf) -> Vec<PathBuf> {
     get_files(path, ".h")
 }
 
+#[inline(always)]
 pub fn get_src_files(path: &PathBuf) -> Vec<PathBuf> {
     get_files(path, ".c")
 }

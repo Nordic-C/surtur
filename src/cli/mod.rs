@@ -6,13 +6,17 @@ pub mod config;
 pub mod creator;
 pub mod deps;
 pub mod initiator;
+pub mod scripts;
 
-use std::{collections::HashMap, env, path::PathBuf};
+use std::{env, path::PathBuf};
 
+use anyhow::{bail, Context};
 use clap::{arg, command, value_parser, ArgMatches, Command as CCommand};
-use clutils::{files::FileHandler, map};
 
-use crate::{subcommand, util::MISSING_CFG};
+use crate::{
+    subcommand,
+    util::{files::FileHandler, MISSING_CFG},
+};
 
 use self::{
     compiler::{executor, CompType},
@@ -38,57 +42,46 @@ pub struct Cli {
     pub cur_dir: PathBuf,
 }
 
-impl Default for Cli {
-    fn default() -> Self {
-        let cur_dir = match env::current_dir() {
-            Ok(dir) => dir,
-            Err(_) => todo!(),
-        };
+impl Cli {
+    pub fn default() -> anyhow::Result<Self> {
+        let cur_dir = env::current_dir()?;
 
         let path = cur_dir.join("project.lua");
 
-        let cfg = match FileHandler::new(&path) {
-            Ok(fh) => Some(Config::parse(fh)),
-            Err(_) => None,
+        let fh =
+            FileHandler::new(&path.as_path()).context(format!("Failed to find path: {path:?}"))?;
+        let cfg = match Config::parse(fh).context("Failed to parse config file") {
+            Ok(cfg) => Some(cfg),
+            Err(err) => return Err(err),
         };
 
-        Self { cfg, cur_dir }
+        Ok(Self { cfg, cur_dir })
     }
 }
 
 impl Cli {
-    // TODO: add this back
-    pub fn get_cmd_tips(&self) -> HashMap<&str, &str> {
-        map! [
-            "uninstall" => "remove",
-            "install" => "add",
-            "compile" => "build",
-            "execute" => "run",
-            "create" => "new",
-            "package" => "bundle"
-        ]
-    }
-
     #[inline]
-    pub fn execute(self) {
+    pub fn exec(self) -> anyhow::Result<()> {
         self.match_args()
     }
 
-    fn match_args(self) {
+    fn match_args(self) -> anyhow::Result<()> {
         match Self::handle_cmd() {
-            m if m.subcommand_matches("run").is_some() => executor::run_c(self, false),
+            m if m.subcommand_matches("run").is_some() => executor::run_c(self, false)?,
             m if m.subcommand_matches("build").is_some() => {
                 executor::build_c(self, CompType::Exe, false, false)
+                    .context("Failed to build program as executable")?;
             }
             m if m.subcommand_matches("init").is_some() => {
-                initiator::init_proj(&Project::new(&self.cur_dir))
+                initiator::init_proj(&Project::new(&self.cur_dir))?;
             }
-            m if m.subcommand_matches("test").is_some() => self.run_test(m),
-            m if m.subcommand_matches("dbg-deps").is_some() => self.dbg_deps(),
+            m if m.subcommand_matches("test").is_some() => self.run_test(m)?,
+            m if m.subcommand_matches("dbg-deps").is_some() => self.dbg_deps()?,
             // Switch this to if let guards once they are stabelized
-            m if m.subcommand_matches("new").is_some() => Self::new_proj(m),
+            m if m.subcommand_matches("new").is_some() => Self::new_proj(m)?,
             _ => println!("{}", INTRO),
         }
+        Ok(())
     }
 
     fn handle_cmd() -> ArgMatches {
@@ -129,8 +122,10 @@ impl Cli {
             .get_matches()
     }
 
-    fn run_test(self, m: ArgMatches) {
-        let cmd = m.subcommand_matches("test").unwrap();
+    fn run_test(self, m: ArgMatches) -> anyhow::Result<()> {
+        let cmd = m
+            .subcommand_matches("test")
+            .context("Failed to match subcommand `test`")?;
         let tests = cmd.get_one::<PathBuf>("NAME");
         executor::run_test(
             self,
@@ -138,29 +133,24 @@ impl Cli {
                 Some(tests) => tests.to_string_lossy().to_string(),
                 None => "*".into(),
             },
-        );
+        )
     }
 
-    fn dbg_deps(&self) {
-        let dep_manager = &self
-            .cfg
-            .as_ref()
-            .unwrap_or_else(|| panic!("{}", MISSING_CFG))
-            .deps;
-        dep_manager.init_dep_dir();
-        dep_manager.download_deps();
+    fn dbg_deps(&self) -> anyhow::Result<()> {
+        let dep_manager = &self.cfg.as_ref().context(format!("{}", MISSING_CFG))?.deps;
+        dep_manager.init_dep_dir()?;
+        dep_manager.download_deps()
     }
 
-    fn new_proj(m: ArgMatches) {
+    fn new_proj(m: ArgMatches) -> anyhow::Result<()> {
         let cmd = m.subcommand_matches("new").unwrap();
         // Unwrap is safe because of .is_some() check
         let name = cmd.get_one::<PathBuf>("NAME");
         let is_lib = cmd.get_flag("lib");
 
         match name {
-                    Some(name) => Project::new(&name).create(is_lib),
-                    None => eprintln!("Failed to create project because of issues with the NAME argument.
-                        Please report this issue on github and give additional context: https://github.com/Thepigcat76/surtur/issues"),
+            Some(name) => Project::new(&name).create(is_lib),
+            None => bail!("Failed to create project because of issues with the NAME argument"),
         }
     }
 }

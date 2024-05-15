@@ -10,6 +10,7 @@
 /// specific dependency
 use std::{collections::HashSet, error::Error, fmt::Display, fs, path::PathBuf};
 
+use anyhow::bail;
 use git2::Repository;
 
 use crate::util;
@@ -30,20 +31,22 @@ impl DepManager {
         Self { deps: dependencies }
     }
 
-    pub fn init_dep_dir(&self) {
+    pub fn init_dep_dir(&self) -> anyhow::Result<()> {
         if fs::metadata("deps").is_err() {
-            util::create_dir("deps");
+            util::create_dir("deps")?;
         }
+        bail!("Failed to create depedency directory")
     }
 
     /// Downloads the dependency into your projects depndency directoy
-    pub fn download_deps(&self) {
+    pub fn download_deps(&self) -> anyhow::Result<()> {
         for dep in &self.deps {
             let url = &dep.origin;
-            if let Err(err) = Repository::clone(url, format!("deps/{}", dep.name())) {
+            if let Err(err) = Repository::clone(url, format!("deps/{}", dep.name()?)) {
                 eprintln!("{}", err)
             }
         }
+        Ok(())
     }
 }
 
@@ -63,17 +66,17 @@ impl Dependency {
         }
     }
 
-    pub fn name(&self) -> String {
+    pub fn name(&self) -> anyhow::Result<String> {
         let split_path: Vec<&str> = self.origin.split('/').collect();
         let name = match split_path.last() {
             Some(name) => name.to_string(),
-            None => panic!("Invalid origin {}", self.origin),
+            None => bail!("Invalid origin {}", self.origin),
         };
-        name[..name.len() - 4].into()
+        Ok(name[..name.len() - 4].into())
     }
 
-    pub fn location(&self) -> PathBuf {
-        format!("deps/{}", self.name()).into()
+    pub fn location(&self) -> anyhow::Result<PathBuf> {
+        Ok(format!("deps/{}", self.name()?).into())
     }
 }
 

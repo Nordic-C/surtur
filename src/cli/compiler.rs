@@ -3,6 +3,8 @@
 /// building, running, linking and bundling libraries.
 use std::{fmt::Display, path::PathBuf, process::Command};
 
+use anyhow::Context;
+
 use crate::util;
 
 use super::{
@@ -23,23 +25,18 @@ pub enum Standard {
     Gnu17,
     Gnu2X,
 }
-
-impl Standard {
-    pub fn all() -> [Standard; 10] {
-        [
-            Standard::C89,
-            Standard::C99,
-            Standard::C11,
-            Standard::C17,
-            Standard::C2X,
-            Standard::Gnu89,
-            Standard::Gnu99,
-            Standard::Gnu11,
-            Standard::Gnu17,
-            Standard::Gnu2X,
-        ]
-    }
-}
+pub const STANDARDS: [Standard; 10] = [
+    Standard::C89,
+    Standard::C99,
+    Standard::C11,
+    Standard::C17,
+    Standard::C2X,
+    Standard::Gnu89,
+    Standard::Gnu99,
+    Standard::Gnu11,
+    Standard::Gnu17,
+    Standard::Gnu2X,
+];
 
 impl Display for Standard {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -74,16 +71,17 @@ pub struct Compiler<'c> {
 }
 
 impl<'c> Compiler<'c> {
-    pub fn new(cur_dir: &'c PathBuf, cfg: Config) -> Self {
-        let root_name = util::root_dir_name(cur_dir);
-        Self {
+    pub fn new(cur_dir: &'c PathBuf, cfg: Config) -> anyhow::Result<Self> {
+        let root_name =
+            util::root_dir_name(cur_dir).context("Failed to get root name of project")?;
+        Ok(Self {
             cmd: cfg.compiler,
             dm: cfg.deps,
             proj_type: cfg.proj_type,
             std: cfg.c_std,
             proj_dir: cur_dir,
             root_name,
-        }
+        })
     }
 
     pub fn build(
@@ -95,7 +93,7 @@ impl<'c> Compiler<'c> {
         enable_dbg: bool,
         is_release: bool,
         tests: bool,
-    ) {
+    ) -> anyhow::Result<()> {
         match self.proj_type {
             ProjType::Lib => self.build_lib(root_dir, out_dir, out_name),
             ProjType::Bin => self.build_exe(
@@ -113,7 +111,7 @@ impl<'c> Compiler<'c> {
         enable_dbg: bool,
         is_release: bool,
         tests: bool,
-    ) {
+    ) -> anyhow::Result<()> {
         let standard = format!("-std={}", self.std);
         let mut program = Command::new(&self.cmd);
         let src_files = util::get_src_files(&format!("{}/src", root_dir.display()).into());
@@ -143,14 +141,20 @@ impl<'c> Compiler<'c> {
 
         program.arg(standard);
 
-        self.link_lib(&mut program);
+        self.link_lib(&mut program)?;
 
         program
             .status()
-            .unwrap_or_else(|err| panic!("Failed to compile program: {}", err));
+            .context("Failed to build executable")
+            .map(|_| ())
     }
 
-    fn build_lib(&self, root_dir: &PathBuf, out_dir: &PathBuf, out_name: &str) {
+    fn build_lib(
+        &self,
+        root_dir: &PathBuf,
+        out_dir: &PathBuf,
+        out_name: &str,
+    ) -> anyhow::Result<()> {
         let standard = format!("-std={}", self.std);
         let src_files = util::get_src_files(&format!("{}/src", root_dir.display()).into());
         let mut out_names = Vec::new();
@@ -162,7 +166,7 @@ impl<'c> Compiler<'c> {
                 .to_string()
                 .split('/')
                 .last()
-                .unwrap_or_else(|| panic!("Invalid src file path: {}", file.display()))
+                .context(format!("Invalid src file path: {}", file.display()))?
                 .to_string();
             let out_path = format!("build/{}o", &name[..name.len() - 1]);
             program
@@ -176,15 +180,9 @@ impl<'c> Compiler<'c> {
                 .arg(&standard);
             program
                 .spawn()
-                .unwrap_or_else(|err| {
-                    panic!(
-                        "Failed to compile src file: {}, error: {}",
-                        &file.display(),
-                        err
-                    )
-                })
+                .context(format!("Failed to compile src file: {}", &file.display()))?
                 .wait()
-                .expect("Failed to wait lol");
+                .context("Failed to wait for src file to compile")?;
             out_names.push(out_path);
         }
         let mut linker = Command::new("ar");
@@ -192,22 +190,26 @@ impl<'c> Compiler<'c> {
             .arg("rcs")
             .arg(format!("{}/{}.a", out_dir.display(), out_name))
             .args(out_names);
-        linker.spawn().expect("Failed to link library");
+        linker.spawn().context("Failed to link library")?;
+        Ok(())
     }
 
-    fn link_lib(&self, cmd: &mut Command) {
+    fn link_lib(&self, cmd: &mut Command) -> anyhow::Result<()> {
         cmd.arg("-Lbuild/");
         for dep in &self.dm.deps {
-            cmd.arg(format!("-l:{}.a", dep.name()));
+            cmd.arg(format!("-l:{}.a", dep.name()?));
         }
+        Ok(())
     }
 
-    fn build_deps(&self) {
+    fn build_deps(&self) -> anyhow::Result<()> {
         for dep in &self.dm.deps {
             let out_dir = format!("{}/build", &self.proj_dir.display());
-            let name = self.dm.deps.get(dep).unwrap().name();
-            self.build_lib(&dep.location(), &out_dir.into(), &name);
+            let name = dep.name()?;
+            self.build_lib(&dep.location()?, &out_dir.into(), &name)
+                .context(format!("Failed to build library {}", name))?;
         }
+        Ok(())
     }
 }
 
@@ -217,6 +219,8 @@ impl<'c> Compiler<'c> {
 pub mod executor {
     use std::{env, fs, path::PathBuf, process::Command};
 
+    use anyhow::Context;
+
     use crate::{
         cli::Cli,
         util::{self, MISSING_CFG},
@@ -224,11 +228,14 @@ pub mod executor {
 
     use super::{CompType, Compiler};
 
-    pub fn run_c(cli: Cli, enable_dbg: bool) {
+    pub fn run_c(cli: Cli, enable_dbg: bool) -> anyhow::Result<()> {
         let root_name = util::root_dir_name(&cli.cur_dir);
-        let executable_path = format!("./build/{}", root_name);
+        let executable_path = format!(
+            "./build/{}",
+            root_name.context("Failed to get root name of project")?
+        );
 
-        self::build_c(cli, CompType::Exe, enable_dbg, false);
+        self::build_c(cli, CompType::Exe, enable_dbg, false)?;
 
         // Create a Command to run the executable
         let mut cmd = Command::new(executable_path);
@@ -239,60 +246,75 @@ pub mod executor {
                     eprintln!("Command failed with exit code: {}", status);
                 }
             }
-            Err(err) => eprintln!("Error: {:?}", err),
+            Err(err) => {
+                return Err(err)
+                    .context("Failed to run the c program. Execution of the program failed.")
+            }
         }
+        Ok(())
     }
 
-    pub fn build_c(cli: Cli, comp_type: CompType, enable_dbg: bool, is_release: bool) {
-        let cfg = cli.cfg.unwrap_or_else(|| panic!("{}", MISSING_CFG));
-        let compiler = Compiler::new(&cli.cur_dir, cfg);
+    pub fn build_c(
+        cli: Cli,
+        comp_type: CompType,
+        enable_dbg: bool,
+        is_release: bool,
+    ) -> anyhow::Result<()> {
+        let cfg = cli.cfg.context(format!("{}", MISSING_CFG))?;
+        if let Some(sm) = &cfg.scripts {
+            sm.exec().context("Failed to run build scripts")?;
+        }
+        let compiler = Compiler::new(&cli.cur_dir, cfg)?;
 
-        let root_name = util::root_dir_name(&cli.cur_dir);
+        let root_name =
+            util::root_dir_name(&cli.cur_dir).context("Failed to get root name of project")?;
 
         if fs::metadata("./build").is_err() {
-            fs::create_dir("./build").expect("Failed to create build directory")
+            fs::create_dir("./build").context("Failed to create build directory")?
         }
 
-        compiler.build_deps();
+        compiler
+            .build_deps()
+            .context("Failed to build dependencies")?;
 
         compiler.build(
-            &env::current_dir().unwrap_or_else(|err| panic!("Failed to get cur dir: {}", err)),
+            &env::current_dir().context(format!("Failed to get cur dir"))?,
             &PathBuf::from("build"),
             root_name.into(),
             comp_type,
             enable_dbg,
             is_release,
             false,
-        );
+        )
     }
 
-    pub fn run_test(cli: Cli, tests: &String) {
-        let cfg = cli.cfg.unwrap_or_else(|| panic!("{}", MISSING_CFG));
-        let compiler = Compiler::new(&cli.cur_dir, cfg);
+    pub fn run_test(cli: Cli, tests: &str) -> anyhow::Result<()> {
+        let cfg = cli.cfg.context(format!("{}", MISSING_CFG))?;
+        let compiler = Compiler::new(&cli.cur_dir, cfg)?;
 
         if fs::metadata("./build").is_err() {
-            fs::create_dir("./build").expect("Failed to create build directory")
+            fs::create_dir("./build").context("Failed to create build directory")?
         }
 
         if fs::metadata("./build/tests").is_err() {
-            fs::create_dir("./build/tests").expect("Failed to create tests directory")
+            fs::create_dir("./build/tests").context("Failed to create build/tests directory")?
         }
 
-        compiler.build_deps();
+        compiler.build_deps()?;
 
         compiler.build(
-            &env::current_dir().unwrap_or_else(|err| panic!("Failed to get cur dir: {}", err)),
+            &env::current_dir()?,
             &PathBuf::from("build/tests"),
             &compiler.root_name,
             CompType::Exe,
             false,
             false,
             true,
-        );
+        )?;
 
         env::set_var("SURTUR_TESTS", tests);
 
         let mut program = Command::new(format!("./build/tests/{}", compiler.root_name));
-        program.spawn().unwrap_or_else(|err| panic!("{err}"));
+        program.spawn().context("Failed to run tests").map(|_| ())
     }
 }
