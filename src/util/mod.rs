@@ -3,10 +3,11 @@ pub mod files;
 /// Provides various utility functions
 pub mod macros;
 
-use std::error::Error;
-use std::{fs, path::PathBuf};
+use std::env;
+use std::process::Command;
+use std::{fs, error::Error, path::PathBuf};
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 
 pub const MISSING_CFG: &str = "Failed to find the project's config file (project.lua)";
 
@@ -20,6 +21,23 @@ pub fn root_dir_name(cur_dir: &PathBuf) -> Option<&str> {
 #[inline(always)]
 pub fn create_dir(dir: &str) -> anyhow::Result<()> {
     fs::create_dir(dir).context(format!("Failed to create directory: {}", dir))
+}
+
+pub fn run_c_program(cmd: &mut Command, cur_dir: &PathBuf) -> anyhow::Result<()> {
+    env::set_var("SURTUR_PROJ_DIR", cur_dir);
+
+    match cmd.status() {
+        Ok(status) => {
+            if !status.success() {
+                bail!("Command failed with exit code: {}", status);
+            }
+            Ok(())
+        }
+        Err(err) => {
+            return Err(err)
+                .context("Failed to run the c program. Execution of the program failed.")
+        }
+    }
 }
 
 // recursively go through directory

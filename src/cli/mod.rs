@@ -5,6 +5,7 @@ pub mod compiler;
 pub mod config;
 pub mod creator;
 pub mod deps;
+pub mod executor;
 pub mod initiator;
 pub mod scripts;
 
@@ -19,7 +20,7 @@ use crate::{
 };
 
 use self::{
-    compiler::{executor, CompType},
+    compiler::CompType,
     config::Config,
     creator::Project,
 };
@@ -68,7 +69,13 @@ impl Cli {
 
     fn match_args(self) -> anyhow::Result<()> {
         match Self::handle_cmd() {
-            m if m.subcommand_matches("run").is_some() => executor::run_c(self, false)?,
+            m if m.subcommand_matches("run").is_some() => {
+                let matches = m.subcommand_matches("run").unwrap();
+            
+                let args: Vec<&String> = matches.get_many("PROGRAM_ARGS").unwrap().collect();
+
+                executor::run_c(self, false, args)?
+            },
             m if m.subcommand_matches("build").is_some() => {
                 executor::build_c(self, CompType::Exe, false, false)
                     .context("Failed to build program as executable")?;
@@ -87,7 +94,7 @@ impl Cli {
 
     fn handle_cmd() -> ArgMatches {
         command!()
-            .subcommand(CCommand::new("run").about("Run the current binary project"))
+            .subcommand(CCommand::new("run").about("Run the current binary project").arg(arg!(<PROGRAM_ARGS> ... "Args").required(false)))
             .subcommand(CCommand::new("init").about("Initialize a surtur project in the current directory"))
             .subcommand(
                 CCommand::new("build")
