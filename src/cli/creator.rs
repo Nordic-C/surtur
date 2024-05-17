@@ -62,7 +62,7 @@ impl<'p> Project<'p> {
 
     #[inline(always)]
     fn create_root_dir(&self) -> anyhow::Result<()> {
-        util::create_dir(&self.name)
+        util::create_dir(&self.name).context(format!("Failed to create project: {}", self.name))
     }
 
     fn create_git_repo(&self) -> anyhow::Result<()> {
@@ -81,24 +81,23 @@ impl<'p> Project<'p> {
             concat!(
                 "-- properties\n",
                 "Name = \"{}\"\n",
-                "Properties = {{\n",
+                "Props = {{\n",
                 "    std = \"c17\",\n",
                 "    version = \"0.1\",\n",
                 "    type = \"{}\",\n",
                 "    compiler = \"{}\",\n",
-                "}}\n\n",
-                "-- C files that should not be compiled manually (don't have a header)\n",
+                "}}\n",
                 "{}",
                 "\n-- external dependenciess\n",
                 "Dependencies = {{\n",
-                "    -- {{ \"dependency_name\", 0.1 }}\n",
+                "    -- {{ \"https://github.com/Surtur-Team/surtests\", 0.1 }}\n",
                 "}}\n"
             ),
             name,
             if lib { "lib" } else { "bin" },
             DEFAULT_COMPILER,
             if lib {
-                "\n-- lib.c is excluded here if your project is a library\nExclude = {\n    \"lib.c\",\n}\n"
+                "\n-- C files that should not be compiled manually (don't have a header)\n-- lib.c is excluded here if your project is a library\nExclude = {\n    \"lib.c\",\n}\n"
             } else {
                 ""
             }

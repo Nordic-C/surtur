@@ -62,8 +62,8 @@ pub enum CompType {
 }
 
 pub struct Compiler<'c> {
-    cmd: String,
-    dm: DepManager,
+    cmd: &'c String,
+    dm: &'c DepManager,
     std: Standard,
     proj_type: ProjType,
     proj_dir: &'c PathBuf,
@@ -71,12 +71,12 @@ pub struct Compiler<'c> {
 }
 
 impl<'c> Compiler<'c> {
-    pub fn new(cur_dir: &'c PathBuf, cfg: Config) -> anyhow::Result<Self> {
+    pub fn new(cur_dir: &'c PathBuf, cfg: &'c Config) -> anyhow::Result<Self> {
         let root_name =
             util::root_dir_name(cur_dir).context("Failed to get root name of project")?;
         Ok(Self {
-            cmd: cfg.compiler,
-            dm: cfg.deps,
+            cmd: &cfg.compiler,
+            dm: &cfg.deps,
             proj_type: cfg.proj_type,
             std: cfg.c_std,
             proj_dir: cur_dir,
@@ -262,9 +262,9 @@ pub mod executor {
     ) -> anyhow::Result<()> {
         let cfg = cli.cfg.context(format!("{}", MISSING_CFG))?;
         if let Some(sm) = &cfg.scripts {
-            sm.exec().context("Failed to run build scripts")?;
+            sm.pre_exec().context("Failed to run build scripts")?;
         }
-        let compiler = Compiler::new(&cli.cur_dir, cfg)?;
+        let compiler = Compiler::new(&cli.cur_dir, &cfg)?;
 
         let root_name =
             util::root_dir_name(&cli.cur_dir).context("Failed to get root name of project")?;
@@ -285,12 +285,18 @@ pub mod executor {
             enable_dbg,
             is_release,
             false,
-        )
+        )?;
+
+        if let Some(sm) = &cfg.scripts {
+            sm.post_exec().context("Failed to run build scripts")?;
+        }
+
+        Ok(())
     }
 
     pub fn run_test(cli: Cli, tests: &str) -> anyhow::Result<()> {
         let cfg = cli.cfg.context(format!("{}", MISSING_CFG))?;
-        let compiler = Compiler::new(&cli.cur_dir, cfg)?;
+        let compiler = Compiler::new(&cli.cur_dir, &cfg)?;
 
         if fs::metadata("./build").is_err() {
             fs::create_dir("./build").context("Failed to create build directory")?

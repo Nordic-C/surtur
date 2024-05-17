@@ -145,20 +145,37 @@ impl Config {
             }
         }
 
-        let mut scripts = Vec::new();
+        let mut pre_scripts = Vec::new();
+        let mut post_scripts = Vec::new();
 
         if let Some(table) = scripts_table {
-            for (index, script) in table.sequence_values::<String>().enumerate() {
-                scripts.push(PathBuf::from(script.context(format!(
-                    "Failed to get script at index: {index} (lua indexing)"
-                ))?))
+            for scripts in table.pairs::<String, Table>() {
+                if let Ok((key, val)) = scripts {
+                    match key.as_str() {
+                        "pre" => {
+                            pre_scripts = val
+                                .sequence_values::<String>()
+                                .into_iter()
+                                .map(|val| PathBuf::from(val.unwrap()))
+                                .collect()
+                        }
+                        "post" => {
+                            post_scripts = val
+                                .sequence_values::<String>()
+                                .into_iter()
+                                .map(|val| PathBuf::from(val.unwrap()))
+                                .collect()
+                        }
+                        key => bail!("Found invalid key: {key}"),
+                    }
+                }
             }
         }
 
-        let scripts = if scripts.is_empty() {
+        let scripts = if pre_scripts.is_empty() && post_scripts.is_empty() {
             None
         } else {
-            Some(ScriptManager::new(scripts))
+            Some(ScriptManager::new(pre_scripts, post_scripts))
         };
 
         Ok(Self {

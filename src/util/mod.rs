@@ -1,10 +1,10 @@
 pub mod error;
+pub mod files;
 /// Provides various utility functions
 pub mod macros;
-pub mod files;
 
-use std::{fs, path::PathBuf};
 use std::error::Error;
+use std::{fs, path::PathBuf};
 
 use anyhow::Context;
 

@@ -49,10 +49,11 @@ impl Cli {
         let path = cur_dir.join("project.lua");
 
         let fh =
-            FileHandler::new(&path.as_path()).context(format!("Failed to find path: {path:?}"))?;
-        let cfg = match Config::parse(fh).context("Failed to parse config file") {
-            Ok(cfg) => Some(cfg),
-            Err(err) => return Err(err),
+            FileHandler::new(&path.as_path()).context(format!("Failed to find path: {path:?}")).ok();
+        let cfg = if let Some(fh) = fh {
+            Some(Config::parse(fh)?)
+        } else {
+            None
         };
 
         Ok(Self { cfg, cur_dir })
