@@ -43,11 +43,7 @@ Run `cargo run dbg-deps` to install some dependencies (only for debugging)
 
 ## Todo
 
-- Windows and macOS support (adjust commands and c-compiler)
-- Support for "nested" projects (having c files and their header files in another directory in the src directory)
-- Testing system for testing your C code (environment variable controlled test execution?)
-- support for multiple compilers
-- dependency linking
+- Polish dependency system and switch to using a global dependency system
 
 ## Documentation
 
