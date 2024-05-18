@@ -9,6 +9,7 @@ use dirs::home_dir;
 /// This creates the .surtur directory if it does not exist yet
 pub(super) fn init_dir() -> anyhow::Result<()> {
     let home = home_dir().context("Failed")?;
+    println!("HOME DIR: {:?}", home);
     let surtur_path = &home.join(".surtur");
     if !surtur_path.exists() {
         fs::create_dir(surtur_path)?;
