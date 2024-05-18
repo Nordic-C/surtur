@@ -59,9 +59,7 @@ impl Cli {
 
         Ok(Self { cfg, cur_dir })
     }
-}
 
-impl Cli {
     #[inline]
     pub fn exec(self) -> anyhow::Result<()> {
         self.match_args()
@@ -72,7 +70,7 @@ impl Cli {
             m if m.subcommand_matches("run").is_some() => {
                 let matches = m.subcommand_matches("run").unwrap();
             
-                let args: Vec<&String> = matches.get_many("PROGRAM_ARGS").unwrap().collect();
+                let args: Option<Vec<&String>> = matches.get_many("PROGRAM_ARGS").map(|many| many.collect());
 
                 executor::run_c(self, false, args)?
             },

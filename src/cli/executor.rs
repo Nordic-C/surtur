@@ -11,9 +11,9 @@ use crate::{
     util::{self, MISSING_CFG},
 };
 
-use super::compiler::{Compiler, CompType};
+use super::compiler::{CompType, Compiler};
 
-pub fn run_c(cli: Cli, enable_dbg: bool, args: Vec<&String>) -> anyhow::Result<()> {
+pub fn run_c(cli: Cli, enable_dbg: bool, args: Option<Vec<&String>>) -> anyhow::Result<()> {
     let cur_dir = cli.cur_dir.clone();
     let root_name = util::root_dir_name(&cur_dir);
     let executable_path = format!(
@@ -25,7 +25,9 @@ pub fn run_c(cli: Cli, enable_dbg: bool, args: Vec<&String>) -> anyhow::Result<(
 
     // Create a Command to run the executable
     let mut cmd = Command::new(executable_path);
-    cmd.args(args);
+    if let Some(args) = args {
+        cmd.args(args);
+    }
 
     util::run_c_program(&mut cmd, &cur_dir)
 }
@@ -99,6 +101,6 @@ pub fn run_test(cli: Cli, tests: &str) -> anyhow::Result<()> {
     env::set_var("SURTUR_TESTS", tests);
 
     let mut program = Command::new(format!("./build/tests/{}", compiler.root_name));
-    
+
     util::run_c_program(&mut program, root_dir)
 }

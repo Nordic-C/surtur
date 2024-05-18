@@ -7,5 +7,6 @@ edition = "2021"
 anyhow = "1.0.84"
 clap = { version = "4.5.4", features = ["cargo"] }
 colored = "2.1.0"
+dirs = "5.0.1"
 git2 = "0.18.3"
 mlua = { version = "0.9.8", features = ["lua54", "vendored"]}
