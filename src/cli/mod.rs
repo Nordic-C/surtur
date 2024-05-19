@@ -19,11 +19,7 @@ use crate::{
     util::{files::FileHandler, MISSING_CFG},
 };
 
-use self::{
-    compiler::CompType,
-    config::Config,
-    creator::Project,
-};
+use self::{config::Config, creator::Project};
 
 const INTRO: &str = r#"
 This is the Surtur build tool for C
@@ -34,7 +30,7 @@ The most important commands are:
 - build // compiles your program
 - add <name> // adds the specified library
 - remove <name> // removes the specified library
-- dbg-deps // Exists only for debugging and testing dependencies
+- update // Update & install dependencies
 - init // initialize a surtur C project
 "#;
 
@@ -49,10 +45,11 @@ impl Cli {
 
         let path = cur_dir.join("project.lua");
 
-        let fh =
-            FileHandler::new(&path.as_path()).context(format!("Failed to find path: {path:?}")).ok();
+        let fh = FileHandler::new(&path.as_path())
+            .context(format!("Failed to find path: {path:?}"))
+            .ok();
         let cfg = if let Some(fh) = fh {
-            Some(Config::parse(fh)?)
+            Some(Config::parse(&cur_dir, fh)?)
         } else {
             None
         };
@@ -69,20 +66,30 @@ impl Cli {
         match Self::handle_cmd() {
             m if m.subcommand_matches("run").is_some() => {
                 let matches = m.subcommand_matches("run").unwrap();
-            
-                let args: Option<Vec<&String>> = matches.get_many("PROGRAM_ARGS").map(|many| many.collect());
 
-                executor::run_c(self, false, args)?
-            },
+                let args: Option<Vec<&String>> =
+                    matches.get_many("PROGRAM_ARGS").map(|many| many.collect());
+
+                let enable_dbg = matches.get_flag("debug");
+
+                executor::run_c(self, enable_dbg, args)?
+            }
             m if m.subcommand_matches("build").is_some() => {
-                executor::build_c(self, CompType::Exe, false, false)
+                let matches = m.subcommand_matches("build").unwrap();
+
+                let enable_dbg = matches.get_flag("debug");
+                let is_release = matches.get_flag("release");
+
+                executor::build_c(self, enable_dbg, false, is_release)
                     .context("Failed to build program as executable")?;
             }
             m if m.subcommand_matches("init").is_some() => {
                 initiator::init_proj(&Project::new(&self.cur_dir))?;
             }
             m if m.subcommand_matches("test").is_some() => self.run_test(m)?,
-            m if m.subcommand_matches("dbg-deps").is_some() => self.dbg_deps()?,
+            m if m.subcommand_matches("update").is_some() => {
+                self.update(m.subcommand_matches("update").unwrap().get_flag("force"))?
+            }
             // Switch this to if let guards once they are stabelized
             m if m.subcommand_matches("new").is_some() => Self::new_proj(m)?,
             _ => println!("{}", INTRO),
@@ -92,9 +99,21 @@ impl Cli {
 
     fn handle_cmd() -> ArgMatches {
         command!()
-            .subcommand(CCommand::new("run").about("Run the current binary project").arg(arg!(<PROGRAM_ARGS> ... "Args").required(false)))
-            .subcommand(CCommand::new("init").about("Initialize a surtur project in the current directory"))
             .subcommand(
+                CCommand::new("run")
+                .about("Run the current binary project")
+                .arg(
+                    arg!(-d --debug "Enable debug mode for this project")
+                        .required(false)
+                )
+                .arg(
+                    arg!(<PROGRAM_ARGS> ... "Args")
+                        .required(false)
+                )
+            ).subcommand(
+                CCommand::new("init")
+                .about("Initialize a surtur project in the current directory")
+            ).subcommand(
                 CCommand::new("build")
                     .about("Build the project into a library or executable")
                     .arg(
@@ -124,8 +143,12 @@ impl Cli {
                 "create a new project",
                 arg!(<NAME> "name for the project")
             ).arg(arg!(-l --lib "Mark the project as a library")))
-            .subcommand(CCommand::new("dbg-deps").about("Only exists for debugging dependencies. // TODO: remove this"))
-            .get_matches()
+            .subcommand(CCommand::new("update")
+                .about("Update or install dependecies")
+                .arg(
+                    arg!(-f --force "Force update dependencies, even if there is no new version")
+                        .required(false))
+            ).get_matches()
     }
 
     fn run_test(self, m: ArgMatches) -> anyhow::Result<()> {
@@ -142,10 +165,9 @@ impl Cli {
         )
     }
 
-    fn dbg_deps(&self) -> anyhow::Result<()> {
+    fn update(&self, forced: bool) -> anyhow::Result<()> {
         let dep_manager = &self.cfg.as_ref().context(format!("{}", MISSING_CFG))?.deps;
-        dep_manager.init_dep_dir()?;
-        dep_manager.download_deps()
+        dep_manager.download_deps(forced)
     }
 
     fn new_proj(m: ArgMatches) -> anyhow::Result<()> {

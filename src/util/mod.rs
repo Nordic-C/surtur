@@ -3,6 +3,7 @@ pub mod files;
 /// Provides various utility functions
 pub mod macros;
 
+use std::collections::HashSet;
 use std::env;
 use std::process::Command;
 use std::{fs, error::Error, path::PathBuf};
@@ -41,7 +42,8 @@ pub fn run_c_program(cmd: &mut Command, cur_dir: &PathBuf) -> anyhow::Result<()>
 }
 
 // recursively go through directory
-pub fn get_files(path: &PathBuf, ending: &str) -> Vec<PathBuf> {
+// TODO: Remove recursion as it creates a bunch of unnessecary heap allocations
+fn get_files(path: &PathBuf, ending: &str) -> HashSet<PathBuf> {
     let dir = fs::read_dir(path)
         .unwrap_or_else(|_| panic!("Failed to find directory: {}", path.display()));
     dir.flatten()
@@ -53,9 +55,9 @@ pub fn get_files(path: &PathBuf, ending: &str) -> Vec<PathBuf> {
                 let file_name = entry.file_name().to_string_lossy().to_string();
                 let file_ending = &file_name[file_name.len() - 2..];
                 if file_ending == ending {
-                    vec![entry.path()]
+                    HashSet::from([entry.path()])
                 } else {
-                    vec![]
+                    HashSet::new()
                 }
             }
         })
@@ -64,12 +66,12 @@ pub fn get_files(path: &PathBuf, ending: &str) -> Vec<PathBuf> {
 }
 
 #[inline(always)]
-pub fn get_header_files(path: &PathBuf) -> Vec<PathBuf> {
+pub fn get_header_files(path: &PathBuf) -> HashSet<PathBuf> {
     get_files(path, ".h")
 }
 
 #[inline(always)]
-pub fn get_src_files(path: &PathBuf) -> Vec<PathBuf> {
+pub fn get_src_files(path: &PathBuf) -> HashSet<PathBuf> {
     get_files(path, ".c")
 }
 

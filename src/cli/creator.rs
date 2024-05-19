@@ -23,7 +23,7 @@ int main(void) {
 }
 "#;
 
-const GITIGNORE_LAYOUT: &str = concat!("build/\n", "deps/\n");
+const GITIGNORE_LAYOUT: &str = "build/\n";
 
 impl<'p> Project<'p> {
     pub fn new(root_dir: &'p PathBuf) -> Self {

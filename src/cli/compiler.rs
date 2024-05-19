@@ -1,7 +1,7 @@
 /// Handling of building and running the c program with gcc.
 /// This inclues functions for
 /// building, running, linking and bundling libraries.
-use std::{fmt::Display, path::PathBuf, process::Command};
+use std::{collections::HashSet, fmt::Display, path::PathBuf, process::Command};
 
 use anyhow::Context;
 
@@ -87,35 +87,36 @@ impl<'c> Compiler<'c> {
     #[inline(always)]
     pub fn build(
         &self,
+        excluded: &HashSet<PathBuf>,
         root_dir: &PathBuf,
         out_dir: &PathBuf,
         out_name: &str,
-        comp_type: CompType,
         enable_dbg: bool,
         is_release: bool,
         tests: bool,
     ) -> anyhow::Result<()> {
         match self.proj_type {
-            ProjType::Lib => self.build_lib(root_dir, out_dir, out_name),
+            ProjType::Lib => self.build_lib(excluded, root_dir, out_dir, out_name),
             ProjType::Bin => self.build_exe(
-                root_dir, out_dir, out_name, comp_type, enable_dbg, is_release, tests,
+                excluded, root_dir, out_dir, out_name, enable_dbg, is_release, tests,
             ),
         }
     }
 
     pub fn build_exe(
         &self,
+        excluded: &HashSet<PathBuf>,
         root_dir: &PathBuf,
         out_dir: &PathBuf,
         out_name: &str,
-        comp_type: CompType,
         enable_dbg: bool,
         is_release: bool,
         tests: bool,
     ) -> anyhow::Result<()> {
         let standard = format!("-std={}", self.std);
         let mut program = Command::new(&self.cmd);
-        let src_files = util::get_src_files(&format!("{}/src", root_dir.display()).into());
+        let mut src_files = util::get_src_files(&root_dir.join("src"));
+        src_files.retain(|e| !excluded.contains(e));
 
         if enable_dbg {
             program.arg("-g");
@@ -123,22 +124,14 @@ impl<'c> Compiler<'c> {
             program.arg("-o3");
         }
 
-        program.arg("-I./deps");
+        program
+            .args(src_files)
+            .arg("-o")
+            .arg(format!("{}/{}", out_dir.display(), out_name));
 
-        let mut program = match comp_type {
-            // TODO: linux && macOS file ending
-            CompType::Exe => {
-                program.args(src_files).arg("-o").arg(format!(
-                    "{}/{}",
-                    out_dir.display(),
-                    out_name
-                ));
-                if !tests {
-                    program.arg("-DNOTESTS");
-                }
-                program
-            }
-        };
+        if !tests {
+            program.arg("-DNOTESTS");
+        }
 
         program.arg(standard);
 
@@ -152,13 +145,20 @@ impl<'c> Compiler<'c> {
 
     pub fn build_lib(
         &self,
+        excluded: &HashSet<PathBuf>,
         root_dir: &PathBuf,
         out_dir: &PathBuf,
         out_name: &str,
     ) -> anyhow::Result<()> {
         let standard = format!("-std={}", self.std);
-        let src_files = util::get_src_files(&format!("{}/src", root_dir.display()).into());
+        let mut src_files = util::get_src_files(&root_dir.join("src"));
+        src_files.remove(&root_dir.join("src").join("lib.c"));
+        src_files.retain(|e| !excluded.contains(e));
         let mut out_names = Vec::new();
+
+        if src_files.is_empty() {
+            return Ok(());
+        }
 
         for file in src_files {
             let mut program = Command::new(&self.cmd);
@@ -172,7 +172,6 @@ impl<'c> Compiler<'c> {
             let out_path = format!("build/{}o", &name[..name.len() - 1]);
             program
                 .arg("-c")
-                .arg("-I./deps")
                 .arg(&file)
                 .arg("-o")
                 .arg(&out_path)
@@ -207,10 +206,10 @@ impl<'c> Compiler<'c> {
         for dep in &self.dm.deps {
             let out_dir = format!("{}/build", &self.proj_dir.display());
             let name = dep.name()?;
-            self.build_lib(&dep.location()?, &out_dir.into(), &name)
+            let cfg = dep.config()?;
+            self.build_lib(&cfg.excluded, &dep.location()?, &out_dir.into(), &name)
                 .context(format!("Failed to build library {}", name))?;
         }
         Ok(())
     }
 }
-

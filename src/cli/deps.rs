@@ -8,12 +8,13 @@
 /// Individula dependencies are in the Dependency
 /// struct and store basic information about the
 /// specific dependency
-use std::{collections::HashSet, error::Error, fmt::Display, fs, path::PathBuf};
+use std::{collections::HashSet, env, error::Error, fmt::Display, path::PathBuf};
 
 use anyhow::bail;
-use git2::Repository;
 
-use crate::util;
+use crate::{global, util::files::FileHandler};
+
+use super::config::Config;
 
 #[derive(Debug, Default)]
 pub struct DepManager {
@@ -22,8 +23,8 @@ pub struct DepManager {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Dependency {
-    _version: String,
-    origin: String,
+    pub _version: String,
+    pub origin: String,
 }
 
 impl DepManager {
@@ -31,20 +32,10 @@ impl DepManager {
         Self { deps: dependencies }
     }
 
-    pub fn init_dep_dir(&self) -> anyhow::Result<()> {
-        if fs::metadata("deps").is_err() {
-            util::create_dir("deps")?;
-        }
-        bail!("Failed to create depedency directory")
-    }
-
     /// Downloads the dependency into your projects depndency directoy
-    pub fn download_deps(&self) -> anyhow::Result<()> {
+    pub fn download_deps(&self, forced: bool) -> anyhow::Result<()> {
         for dep in &self.deps {
-            let url = &dep.origin;
-            if let Err(err) = Repository::clone(url, format!("deps/{}", dep.name()?)) {
-                eprintln!("{}", err)
-            }
+            global::download_dep(dep, forced)?;
         }
         Ok(())
     }
@@ -76,7 +67,16 @@ impl Dependency {
     }
 
     pub fn location(&self) -> anyhow::Result<PathBuf> {
-        Ok(format!("deps/{}", self.name()?).into())
+        let surtur_home = PathBuf::from(env::var(global::SURTUR_HOME)?);
+        let deps_path = surtur_home.join("deps");
+        Ok(deps_path.join(self.name()?))
+    }
+
+    pub fn config(&self) -> anyhow::Result<Config> {
+        let location = self.location()?;
+        let cfg_path = location.join("project.lua");
+        let file = FileHandler::new(&cfg_path)?;
+        Config::parse(&location, file)
     }
 }
 

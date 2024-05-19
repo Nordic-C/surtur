@@ -4,7 +4,7 @@ use anyhow::{bail, Context};
 /// Handling of the project's lua config file.
 /// It includes the lua parser and all information
 /// related to the project's configuration
-use mlua::{Lua, Result, Table, Value};
+use mlua::{Lua, Table, Value};
 
 use crate::util::{files::FileHandler, DEFAULT_COMPILER};
 
@@ -21,7 +21,7 @@ pub struct Config {
     pub proj_type: ProjType,
     pub deps: DepManager,
     pub entry: PathBuf,
-    pub excluded: Vec<PathBuf>,
+    pub excluded: HashSet<PathBuf>,
     pub scripts: Option<ScriptManager>,
 }
 
@@ -41,13 +41,13 @@ impl Display for ProjType {
 }
 
 impl Config {
-    pub fn parse(file: FileHandler) -> anyhow::Result<Self> {
+    pub fn parse(root_dir: &PathBuf, file: FileHandler) -> anyhow::Result<Self> {
         let mut dependencies = HashSet::new();
         let mut c_std_str = String::from("c17");
         let mut proj_version = None;
         let mut proj_type = ProjType::Lib;
         let mut compiler = String::from(DEFAULT_COMPILER);
-        let mut excluded_vec: Vec<PathBuf> = vec![];
+        let mut excluded: HashSet<PathBuf> = HashSet::new();
 
         let mut c_std: Option<Standard> = None;
 
@@ -79,7 +79,7 @@ impl Config {
             .into(),
         );
 
-        let excluded: Result<Table> = lua.globals().get("Exclude");
+        let excluded_table: Option<Table> = lua.globals().get("Exclude").ok();
 
         for pair in props_table.pairs::<String, String>() {
             let (key, val) = pair.expect("Failed to get pair");
@@ -98,16 +98,18 @@ impl Config {
             }
         }
 
-        match excluded {
-            Ok(table) => {
-                for elem in table.pairs::<u64, String>() {
+        match excluded_table {
+            Some(table) => {
+                for elem in table.sequence_values::<String>() {
                     match elem {
-                        Ok(elem) => excluded_vec.push(elem.1.into()),
+                        Ok(elem) => {
+                            excluded.insert(root_dir.join("src").join(elem));
+                        }
                         Err(_) => (),
                     }
                 }
             }
-            Err(_) => (),
+            None => (),
         }
 
         // Iterating over dependencies
@@ -188,7 +190,7 @@ impl Config {
             deps: DepManager::new(dependencies),
             proj_type,
             entry: entry.into(),
-            excluded: excluded_vec,
+            excluded,
             scripts,
         })
     }
