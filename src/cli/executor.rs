@@ -11,7 +11,10 @@ use crate::{
     util::{self, MISSING_CFG},
 };
 
-use super::{compiler::Compiler, config::ProjType};
+use super::{
+    compiler::{CompileCtx, Compiler},
+    config::ProjType,
+};
 
 pub fn run_c(cli: Cli, enable_dbg: bool, args: Option<Vec<&String>>) -> anyhow::Result<()> {
     let cur_dir = cli.cur_dir.clone();
@@ -38,7 +41,7 @@ pub fn build_c(
     direct_execution: bool,
     is_release: bool,
 ) -> anyhow::Result<()> {
-    let mut cfg = cli.cfg.context(format!("{}", MISSING_CFG))?;
+    let mut cfg = cli.cfg.context(MISSING_CFG)?;
     if let Some(sm) = &cfg.scripts {
         sm.pre_exec().context("Failed to run build scripts")?;
     }
@@ -62,15 +65,14 @@ pub fn build_c(
         .build_deps()
         .context("Failed to build dependencies")?;
 
-    compiler.build(
-        &cfg.excluded,
-        &env::current_dir().context(format!("Failed to get cur dir"))?,
-        &PathBuf::from("build"),
-        root_name.into(),
-        enable_dbg,
-        is_release,
-        false,
-    )?;
+    let ctx = CompileCtx {
+        out_dir: &PathBuf::from("build"),
+        root_dir: &cli.cur_dir,
+        out_name: root_name,
+        excluded: &cfg.excluded,
+    };
+
+    compiler.build(ctx, enable_dbg, is_release, false)?;
 
     if let Some(sm) = &cfg.scripts {
         sm.post_exec().context("Failed to run build scripts")?;
@@ -80,7 +82,7 @@ pub fn build_c(
 }
 
 pub fn run_test(cli: Cli, tests: &str) -> anyhow::Result<()> {
-    let cfg = cli.cfg.context(format!("{}", MISSING_CFG))?;
+    let cfg = cli.cfg.context(MISSING_CFG)?;
     let compiler = Compiler::new(&cli.cur_dir, &cfg)?;
 
     if fs::metadata("./build").is_err() {
@@ -95,15 +97,14 @@ pub fn run_test(cli: Cli, tests: &str) -> anyhow::Result<()> {
 
     let root_dir = &env::current_dir()?;
 
-    compiler.build(
-        &cfg.excluded,
+    let ctx = CompileCtx {
+        excluded: &cfg.excluded,
+        out_dir: &PathBuf::from("build/tests"),
         root_dir,
-        &PathBuf::from("build/tests"),
-        &compiler.root_name,
-        false,
-        false,
-        true,
-    )?;
+        out_name: &cfg.name,
+    };
+
+    compiler.build(ctx, false, false, true)?;
 
     env::set_var("SURTUR_TESTS", tests);
 

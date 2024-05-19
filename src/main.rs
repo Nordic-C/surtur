@@ -6,5 +6,5 @@ use cli::Cli;
 
 fn main() -> anyhow::Result<()> {
     global::init_dir()?;
-    Cli::default()?.exec()
+    Cli::new()?.exec()
 }

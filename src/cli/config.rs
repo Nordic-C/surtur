@@ -1,6 +1,11 @@
-use std::{collections::HashSet, fmt::Display, path::PathBuf};
+use std::{
+    collections::HashSet,
+    fmt::Display,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{bail, Context};
+use clap::builder::Str;
 /// Handling of the project's lua config file.
 /// It includes the lua parser and all information
 /// related to the project's configuration
@@ -15,6 +20,7 @@ use super::{
 };
 
 pub struct Config {
+    pub name: String,
     pub compiler: String,
     pub c_std: Standard,
     pub proj_version: String,
@@ -25,7 +31,7 @@ pub struct Config {
     pub scripts: Option<ScriptManager>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum ProjType {
     Lib,
     Bin,
@@ -41,7 +47,7 @@ impl Display for ProjType {
 }
 
 impl Config {
-    pub fn parse(root_dir: &PathBuf, file: FileHandler) -> anyhow::Result<Self> {
+    pub fn parse(root_dir: &Path, file: FileHandler) -> anyhow::Result<Self> {
         let mut dependencies = HashSet::new();
         let mut c_std_str = String::from("c17");
         let mut proj_version = None;
@@ -59,6 +65,11 @@ impl Config {
         lua.load(&file.file_content)
             .exec()
             .expect("Failed to load context");
+
+        let name: String = lua
+            .globals()
+            .get("Name")
+            .context("Failed to get name property even though it is required")?;
 
         // properties
         let props_table: Table = lua
@@ -98,18 +109,10 @@ impl Config {
             }
         }
 
-        match excluded_table {
-            Some(table) => {
-                for elem in table.sequence_values::<String>() {
-                    match elem {
-                        Ok(elem) => {
-                            excluded.insert(root_dir.join("src").join(elem));
-                        }
-                        Err(_) => (),
-                    }
-                }
+        if let Some(table) = excluded_table {
+            for elem in table.sequence_values::<String>().flatten() {
+                excluded.insert(root_dir.join("src").join(elem));
             }
-            None => (),
         }
 
         // Iterating over dependencies
@@ -151,25 +154,21 @@ impl Config {
         let mut post_scripts = Vec::new();
 
         if let Some(table) = scripts_table {
-            for scripts in table.pairs::<String, Table>() {
-                if let Ok((key, val)) = scripts {
-                    match key.as_str() {
-                        "pre" => {
-                            pre_scripts = val
-                                .sequence_values::<String>()
-                                .into_iter()
-                                .map(|val| PathBuf::from(val.unwrap()))
-                                .collect()
-                        }
-                        "post" => {
-                            post_scripts = val
-                                .sequence_values::<String>()
-                                .into_iter()
-                                .map(|val| PathBuf::from(val.unwrap()))
-                                .collect()
-                        }
-                        key => bail!("Found invalid key: {key}"),
+            for (key, val) in table.pairs::<String, Table>().flatten() {
+                match key.as_str() {
+                    "pre" => {
+                        pre_scripts = val
+                            .sequence_values::<String>()
+                            .map(|val| PathBuf::from(val.unwrap()))
+                            .collect()
                     }
+                    "post" => {
+                        post_scripts = val
+                            .sequence_values::<String>()
+                            .map(|val| PathBuf::from(val.unwrap()))
+                            .collect()
+                    }
+                    key => bail!("Found invalid key: {key}"),
                 }
             }
         }
@@ -181,6 +180,7 @@ impl Config {
         };
 
         Ok(Self {
+            name,
             compiler,
             c_std: match c_std {
                 Some(std) => std,

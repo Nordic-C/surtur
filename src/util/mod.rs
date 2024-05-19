@@ -5,8 +5,9 @@ pub mod macros;
 
 use std::collections::HashSet;
 use std::env;
+use std::path::Path;
 use std::process::Command;
-use std::{fs, error::Error, path::PathBuf};
+use std::{error::Error, fs, path::PathBuf};
 
 use anyhow::{bail, Context};
 
@@ -15,7 +16,7 @@ pub const MISSING_CFG: &str = "Failed to find the project's config file (project
 pub const DEFAULT_COMPILER: &str = "gcc";
 
 #[inline(always)]
-pub fn root_dir_name(cur_dir: &PathBuf) -> Option<&str> {
+pub fn root_dir_name(cur_dir: &Path) -> Option<&str> {
     cur_dir.file_name()?.to_str()
 }
 
@@ -35,8 +36,7 @@ pub fn run_c_program(cmd: &mut Command, cur_dir: &PathBuf) -> anyhow::Result<()>
             Ok(())
         }
         Err(err) => {
-            return Err(err)
-                .context("Failed to run the c program. Execution of the program failed.")
+            Err(err).context("Failed to run the c program. Execution of the program failed.")
         }
     }
 }
@@ -47,7 +47,7 @@ fn get_files(path: &PathBuf, ending: &str) -> HashSet<PathBuf> {
     let dir = fs::read_dir(path)
         .unwrap_or_else(|_| panic!("Failed to find directory: {}", path.display()));
     dir.flatten()
-        .map(|entry| {
+        .flat_map(|entry| {
             let file_type = entry.file_type().expect("Failed to get file type");
             if file_type.is_dir() {
                 get_files(&entry.path(), ending)
@@ -61,7 +61,6 @@ fn get_files(path: &PathBuf, ending: &str) -> HashSet<PathBuf> {
                 }
             }
         })
-        .flatten()
         .collect()
 }
 

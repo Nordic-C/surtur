@@ -1,7 +1,13 @@
 /// Handling of building and running the c program with gcc.
 /// This inclues functions for
 /// building, running, linking and bundling libraries.
-use std::{collections::HashSet, fmt::Display, path::PathBuf, process::Command};
+use std::{
+    collections::HashSet,
+    fmt::Display,
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use anyhow::Context;
 
@@ -70,6 +76,13 @@ pub struct Compiler<'c> {
     pub root_name: &'c str,
 }
 
+pub struct CompileCtx<'ctx> {
+    pub out_dir: &'ctx Path,
+    pub out_name: &'ctx str,
+    pub root_dir: &'ctx Path,
+    pub excluded: &'ctx HashSet<PathBuf>,
+}
+
 impl<'c> Compiler<'c> {
     pub fn new(cur_dir: &'c PathBuf, cfg: &'c Config) -> anyhow::Result<Self> {
         let root_name =
@@ -84,39 +97,33 @@ impl<'c> Compiler<'c> {
         })
     }
 
+    // TODO: Reduce arguments
     #[inline(always)]
     pub fn build(
         &self,
-        excluded: &HashSet<PathBuf>,
-        root_dir: &PathBuf,
-        out_dir: &PathBuf,
-        out_name: &str,
+        ctx: CompileCtx<'c>,
         enable_dbg: bool,
         is_release: bool,
         tests: bool,
     ) -> anyhow::Result<()> {
         match self.proj_type {
-            ProjType::Lib => self.build_lib(excluded, root_dir, out_dir, out_name),
-            ProjType::Bin => self.build_exe(
-                excluded, root_dir, out_dir, out_name, enable_dbg, is_release, tests,
-            ),
+            ProjType::Lib => self.build_lib(ctx),
+            ProjType::Bin => self.build_exe(ctx, enable_dbg, is_release, tests),
         }
     }
 
+    // TODO: Reduce arguments
     pub fn build_exe(
         &self,
-        excluded: &HashSet<PathBuf>,
-        root_dir: &PathBuf,
-        out_dir: &PathBuf,
-        out_name: &str,
+        ctx: CompileCtx<'c>,
         enable_dbg: bool,
         is_release: bool,
         tests: bool,
     ) -> anyhow::Result<()> {
         let standard = format!("-std={}", self.std);
-        let mut program = Command::new(&self.cmd);
-        let mut src_files = util::get_src_files(&root_dir.join("src"));
-        src_files.retain(|e| !excluded.contains(e));
+        let mut program = Command::new(self.cmd);
+        let mut src_files = util::get_src_files(&ctx.root_dir.join("src"));
+        src_files.retain(|e| !ctx.excluded.contains(e));
 
         if enable_dbg {
             program.arg("-g");
@@ -127,7 +134,7 @@ impl<'c> Compiler<'c> {
         program
             .args(src_files)
             .arg("-o")
-            .arg(format!("{}/{}", out_dir.display(), out_name));
+            .arg(ctx.out_dir.join(ctx.out_name));
 
         if !tests {
             program.arg("-DNOTESTS");
@@ -143,17 +150,11 @@ impl<'c> Compiler<'c> {
             .map(|_| ())
     }
 
-    pub fn build_lib(
-        &self,
-        excluded: &HashSet<PathBuf>,
-        root_dir: &PathBuf,
-        out_dir: &PathBuf,
-        out_name: &str,
-    ) -> anyhow::Result<()> {
+    pub fn build_lib(&self, ctx: CompileCtx<'c>) -> anyhow::Result<()> {
         let standard = format!("-std={}", self.std);
-        let mut src_files = util::get_src_files(&root_dir.join("src"));
-        src_files.remove(&root_dir.join("src").join("lib.c"));
-        src_files.retain(|e| !excluded.contains(e));
+        let mut src_files = util::get_src_files(&ctx.root_dir.join("src"));
+        src_files.remove(&ctx.root_dir.join("src").join("lib.c"));
+        src_files.retain(|e| !ctx.excluded.contains(e));
         let mut out_names = Vec::new();
 
         if src_files.is_empty() {
@@ -161,15 +162,10 @@ impl<'c> Compiler<'c> {
         }
 
         for file in src_files {
-            let mut program = Command::new(&self.cmd);
-            let name = file
-                .to_string_lossy()
-                .to_string()
-                .split('/')
-                .last()
-                .context(format!("Invalid src file path: {}", file.display()))?
-                .to_string();
-            let out_path = format!("build/{}o", &name[..name.len() - 1]);
+            let mut program = Command::new(self.cmd);
+            // TODO: Clean this up
+            let name = file.file_name().unwrap().to_string_lossy().to_string();
+            let out_path = ctx.out_dir.join(&name[..name.len() - 2]);
             program
                 .arg("-c")
                 .arg(&file)
@@ -188,7 +184,7 @@ impl<'c> Compiler<'c> {
         let mut linker = Command::new("ar");
         linker
             .arg("rcs")
-            .arg(format!("{}/{}.a", out_dir.display(), out_name))
+            .arg(ctx.out_dir.join(ctx.out_name))
             .args(out_names);
         linker.spawn().context("Failed to link library")?;
         Ok(())
@@ -197,17 +193,25 @@ impl<'c> Compiler<'c> {
     pub fn link_lib(&self, cmd: &mut Command) -> anyhow::Result<()> {
         cmd.arg("-Lbuild/");
         for dep in &self.dm.deps {
-            cmd.arg(format!("-l:{}.a", dep.name()?));
+            let name = dep.name()?;
+            cmd.arg(format!("-l:{}/{}.a", name, name));
         }
         Ok(())
     }
 
     pub fn build_deps(&self) -> anyhow::Result<()> {
         for dep in &self.dm.deps {
-            let out_dir = format!("{}/build", &self.proj_dir.display());
+            let out_dir = self.proj_dir.join("build").join(dep.name()?);
+            fs::create_dir(&out_dir)?;
             let name = dep.name()?;
             let cfg = dep.config()?;
-            self.build_lib(&cfg.excluded, &dep.location()?, &out_dir.into(), &name)
+            let ctx = CompileCtx {
+                out_dir: &out_dir,
+                out_name: &name,
+                root_dir: &dep.location()?,
+                excluded: &cfg.excluded,
+            };
+            self.build_lib(ctx)
                 .context(format!("Failed to build library {}", name))?;
         }
         Ok(())

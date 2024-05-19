@@ -3,7 +3,7 @@
 /// the main.c file and the project.lua config.
 /// In addition to that there are also are helper
 /// functions for creating all directories and files
-use std::{fs::File, io::Write, path::PathBuf};
+use std::{fs::File, io::Write, path::{Path, PathBuf}};
 
 use anyhow::Context;
 use git2::{Repository, RepositoryInitOptions};
@@ -29,8 +29,8 @@ impl<'p> Project<'p> {
     pub fn new(root_dir: &'p PathBuf) -> Self {
         let name = root_dir.file_name().unwrap().to_string_lossy().to_string();
         Self {
-            root_dir: root_dir,
-            name: name,
+            root_dir,
+            name,
         }
     }
 
@@ -45,13 +45,13 @@ impl<'p> Project<'p> {
         self.create_dir("src")?;
 
         // .gitignore file
-        Self::create_gitignore(&self.root_dir)?;
+        Self::create_gitignore(self.root_dir)?;
 
         // Cfg file
-        Self::create_cfg_file(&self.root_dir, &self.name, is_lib)?;
+        Self::create_cfg_file(self.root_dir, &self.name, is_lib)?;
 
         // Main file
-        Self::create_main_file(&self.root_dir, is_lib)?;
+        Self::create_main_file(self.root_dir, is_lib)?;
         Ok(())
     }
 
@@ -104,7 +104,7 @@ impl<'p> Project<'p> {
         )
     }
 
-    pub fn create_main_file(root_dir: &PathBuf, is_lib: bool) -> anyhow::Result<()> {
+    pub fn create_main_file(root_dir: &Path, is_lib: bool) -> anyhow::Result<()> {
         let mut main_file = File::create(format!(
             "{}/src/{}.c",
             root_dir.display(),
@@ -118,7 +118,7 @@ impl<'p> Project<'p> {
             .context("Failed to write example code to main.c file")
     }
 
-    pub fn create_cfg_file(root_dir: &PathBuf, root_name: &str, lib: bool) -> anyhow::Result<()> {
+    pub fn create_cfg_file(root_dir: &Path, root_name: &str, lib: bool) -> anyhow::Result<()> {
         let mut config_file =
             File::create(root_dir.join("project.lua")).context("Failed to create config gile")?;
 
@@ -128,7 +128,7 @@ impl<'p> Project<'p> {
             .context("Failed to write config to project.lua")
     }
 
-    pub fn create_gitignore(root_dir: &PathBuf) -> anyhow::Result<()> {
+    pub fn create_gitignore(root_dir: &Path) -> anyhow::Result<()> {
         let mut gitignore_file = File::create(root_dir.join(".gitignore"))
             .context("Failed to create .gitignore file")?;
 

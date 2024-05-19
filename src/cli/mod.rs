@@ -40,12 +40,12 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn default() -> anyhow::Result<Self> {
+    pub fn new() -> anyhow::Result<Self> {
         let cur_dir = env::current_dir()?;
 
         let path = cur_dir.join("project.lua");
 
-        let fh = FileHandler::new(&path.as_path())
+        let fh = FileHandler::new(path.as_path())
             .context(format!("Failed to find path: {path:?}"))
             .ok();
         let cfg = if let Some(fh) = fh {
@@ -166,7 +166,7 @@ impl Cli {
     }
 
     fn update(&self, forced: bool) -> anyhow::Result<()> {
-        let dep_manager = &self.cfg.as_ref().context(format!("{}", MISSING_CFG))?.deps;
+        let dep_manager = &self.cfg.as_ref().context(MISSING_CFG)?.deps;
         dep_manager.download_deps(forced)
     }
 
@@ -177,7 +177,7 @@ impl Cli {
         let is_lib = cmd.get_flag("lib");
 
         match name {
-            Some(name) => Project::new(&name).create(is_lib),
+            Some(name) => Project::new(name).create(is_lib),
             None => bail!("Failed to create project because of issues with the NAME argument"),
         }
     }

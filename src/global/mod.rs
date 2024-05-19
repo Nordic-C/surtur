@@ -37,9 +37,7 @@ pub(super) fn download_dep(dep: &Dependency, forced: bool) -> anyhow::Result<()>
         }
     } else if dep_path.exists() && forced {
         fs::remove_dir_all(&dep_path)?;
-        if let Err(err) = Repository::clone(url, dep_path) {
-            eprintln!("{}", err);
-        }
+        Repository::clone(url, dep_path)?;
     }
     Ok(())
 }
