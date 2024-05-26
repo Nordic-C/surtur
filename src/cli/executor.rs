@@ -2,7 +2,7 @@
 //! the Compiler for easily running and building
 //! everything
 
-use std::{env, fs, path::PathBuf, process::Command};
+use std::{env, fs, iter::Product, path::{Path, PathBuf}, process::Command};
 
 use anyhow::Context;
 
@@ -54,8 +54,15 @@ pub fn build_c(
 
     let compiler = Compiler::new(&cli.cur_dir, &cfg)?;
 
-    let root_name =
-        util::root_dir_name(&cli.cur_dir).context("Failed to get root name of project")?;
+    let mut root_name = util::root_dir_name(&cli.cur_dir)
+        .context("Failed to get root name of project")?
+        .to_string();
+
+    let out_path = PathBuf::from("build");
+
+    if cfg.proj_type == ProjType::Lib {
+        root_name.push_str(".a");
+    }
 
     if fs::metadata("./build").is_err() {
         fs::create_dir("./build").context("Failed to create build directory")?
@@ -64,11 +71,11 @@ pub fn build_c(
     compiler
         .build_deps()
         .context("Failed to build dependencies")?;
-
+        
     let ctx = CompileCtx {
-        out_dir: &PathBuf::from("build"),
+        out_dir: &out_path,
         root_dir: &cli.cur_dir,
-        out_name: root_name,
+        out_name: &root_name,
         excluded: &cfg.excluded,
     };
 
@@ -82,25 +89,28 @@ pub fn build_c(
 }
 
 pub fn run_test(cli: Cli, tests: &str) -> anyhow::Result<()> {
-    let cfg = cli.cfg.context(MISSING_CFG)?;
+    let mut cfg = cli.cfg.context(MISSING_CFG)?;
+    cfg.proj_type = ProjType::Bin;
     let compiler = Compiler::new(&cli.cur_dir, &cfg)?;
 
-    if fs::metadata("./build").is_err() {
-        fs::create_dir("./build").context("Failed to create build directory")?
+    let build_dir = PathBuf::from("build");
+
+    if !build_dir.exists() {
+        fs::create_dir(&build_dir).context("Failed to create build directory")?
     }
 
-    if fs::metadata("./build/tests").is_err() {
-        fs::create_dir("./build/tests").context("Failed to create build/tests directory")?
+    let tests_dir = build_dir.join("tests");
+
+    if !tests_dir.exists() {
+        fs::create_dir(&tests_dir).context("Failed to create build/tests directory")?
     }
 
     compiler.build_deps()?;
 
-    let root_dir = &env::current_dir()?;
-
     let ctx = CompileCtx {
         excluded: &cfg.excluded,
-        out_dir: &PathBuf::from("build/tests"),
-        root_dir,
+        out_dir: &tests_dir,
+        root_dir: &cli.cur_dir,
         out_name: &cfg.name,
     };
 
@@ -108,7 +118,7 @@ pub fn run_test(cli: Cli, tests: &str) -> anyhow::Result<()> {
 
     env::set_var("SURTUR_TESTS", tests);
 
-    let mut program = Command::new(format!("./build/tests/{}", compiler.root_name));
+    let mut program = Command::new(tests_dir.join(cfg.name));
 
-    util::run_c_program(&mut program, root_dir)
+    util::run_c_program(&mut program, &cli.cur_dir)
 }

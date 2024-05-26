@@ -5,7 +5,6 @@ use std::{
 };
 
 use anyhow::{bail, Context};
-use clap::builder::Str;
 /// Handling of the project's lua config file.
 /// It includes the lua parser and all information
 /// related to the project's configuration
@@ -19,6 +18,7 @@ use super::{
     scripts::ScriptManager,
 };
 
+// TODO: Seperate tables from rest of the struct so it represents the actual config file
 pub struct Config {
     pub name: String,
     pub compiler: String,

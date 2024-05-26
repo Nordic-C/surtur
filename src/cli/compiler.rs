@@ -97,7 +97,6 @@ impl<'c> Compiler<'c> {
         })
     }
 
-    // TODO: Reduce arguments
     #[inline(always)]
     pub fn build(
         &self,
@@ -112,7 +111,6 @@ impl<'c> Compiler<'c> {
         }
     }
 
-    // TODO: Reduce arguments
     pub fn build_exe(
         &self,
         ctx: CompileCtx<'c>,
@@ -161,6 +159,8 @@ impl<'c> Compiler<'c> {
             return Ok(());
         }
 
+        // TODO: Sort all object files into directory
+
         for file in src_files {
             let mut program = Command::new(self.cmd);
             // TODO: Clean this up
@@ -202,8 +202,11 @@ impl<'c> Compiler<'c> {
     pub fn build_deps(&self) -> anyhow::Result<()> {
         for dep in &self.dm.deps {
             let out_dir = self.proj_dir.join("build").join(dep.name()?);
-            fs::create_dir(&out_dir)?;
-            let name = dep.name()?;
+            if !out_dir.exists() {
+                fs::create_dir(&out_dir)?;
+            }
+            let mut name = dep.name()?;
+            name.push_str(".a");
             let cfg = dep.config()?;
             let ctx = CompileCtx {
                 out_dir: &out_dir,
