@@ -1,6 +1,8 @@
 //! Module responsible for global file system operations
 //! like installing dependencies and saving configurations
 
+pub mod extensions;
+
 use std::{env, fs, path::PathBuf};
 
 use anyhow::Context;

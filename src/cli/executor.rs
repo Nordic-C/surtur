@@ -2,7 +2,7 @@
 //! the Compiler for easily running and building
 //! everything
 
-use std::{env, fs, iter::Product, path::{Path, PathBuf}, process::Command};
+use std::{env, fs, path::PathBuf, process::Command};
 
 use anyhow::Context;
 
@@ -48,8 +48,6 @@ pub fn build_c(
 
     if direct_execution {
         cfg.proj_type = ProjType::Bin;
-    } else {
-        cfg.proj_type = ProjType::Lib;
     }
 
     let compiler = Compiler::new(&cli.cur_dir, &cfg)?;
@@ -82,7 +80,7 @@ pub fn build_c(
     compiler.build(ctx, enable_dbg, is_release, false)?;
 
     if let Some(sm) = &cfg.scripts {
-        sm.post_exec().context("Failed to run build scripts")?;
+        sm.post_exec().context("Failed to run post build process scripts")?;
     }
 
     Ok(())
@@ -114,7 +112,7 @@ pub fn run_test(cli: Cli, tests: &str) -> anyhow::Result<()> {
         out_name: &cfg.name,
     };
 
-    compiler.build(ctx, false, false, true)?;
+    compiler.build(ctx, true, false, true)?;
 
     env::set_var("SURTUR_TESTS", tests);
 

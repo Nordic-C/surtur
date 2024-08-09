@@ -1,4 +1,4 @@
-pub mod error;
+pub mod lua_utils;
 pub mod files;
 /// Provides various utility functions
 pub mod macros;
@@ -6,10 +6,10 @@ pub mod macros;
 use std::collections::HashSet;
 use std::env;
 use std::path::Path;
-use std::process::Command;
+use std::process::{exit, Command};
 use std::{error::Error, fs, path::PathBuf};
 
-use anyhow::{bail, Context};
+use anyhow::Context;
 
 pub const MISSING_CFG: &str = "Failed to find the project's config file (project.lua)";
 
@@ -30,10 +30,7 @@ pub fn run_c_program(cmd: &mut Command, cur_dir: &PathBuf) -> anyhow::Result<()>
 
     match cmd.status() {
         Ok(status) => {
-            if !status.success() {
-                bail!("Command failed with exit code: {}", status);
-            }
-            Ok(())
+            exit(status.code().unwrap())
         }
         Err(err) => {
             Err(err).context("Failed to run the c program. Execution of the program failed.")

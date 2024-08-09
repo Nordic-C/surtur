@@ -9,7 +9,7 @@ pub mod executor;
 pub mod initiator;
 pub mod scripts;
 
-use std::{env, path::PathBuf};
+use std::{env, path::PathBuf, process::Command};
 
 use anyhow::{bail, Context};
 use clap::{arg, command, value_parser, ArgMatches, Command as CCommand};
@@ -70,9 +70,7 @@ impl Cli {
                 let args: Option<Vec<&String>> =
                     matches.get_many("PROGRAM_ARGS").map(|many| many.collect());
 
-                let enable_dbg = matches.get_flag("debug");
-
-                executor::run_c(self, enable_dbg, args)?
+                executor::run_c(self, true, args)?
             }
             m if m.subcommand_matches("build").is_some() => {
                 let matches = m.subcommand_matches("build").unwrap();
@@ -90,6 +88,7 @@ impl Cli {
             m if m.subcommand_matches("update").is_some() => {
                 self.update(m.subcommand_matches("update").unwrap().get_flag("force"))?
             }
+            m if m.subcommand_matches("mem-check").is_some() => self.check_mem()?,
             // Switch this to if let guards once they are stabelized
             m if m.subcommand_matches("new").is_some() => Self::new_proj(m)?,
             _ => println!("{}", INTRO),
@@ -110,10 +109,12 @@ impl Cli {
                     arg!(<PROGRAM_ARGS> ... "Args")
                         .required(false)
                 )
-            ).subcommand(
+            )
+            .subcommand(
                 CCommand::new("init")
                 .about("Initialize a surtur project in the current directory")
-            ).subcommand(
+            )
+            .subcommand(
                 CCommand::new("build")
                     .about("Build the project into a library or executable")
                     .arg(
@@ -124,7 +125,8 @@ impl Cli {
                         arg!(-d --debug "Compile the program in debug mode (more advanced debugging capabilities)")
                             .required(false),
                     ),
-            ).subcommand(
+            )
+            .subcommand(
                 subcommand!("test", "Run a specific or all tests",
                 arg!(<NAME> "Specify a test name").required(false))
             )
@@ -148,7 +150,11 @@ impl Cli {
                 .arg(
                     arg!(-f --force "Force update dependencies, even if there is no new version")
                         .required(false))
-            ).get_matches()
+            )
+            .subcommand(CCommand::new("mem-check")
+                .about("Check your program for memory leaks using valgrind")
+            )
+            .get_matches()
     }
 
     fn run_test(self, m: ArgMatches) -> anyhow::Result<()> {
@@ -163,6 +169,17 @@ impl Cli {
                 None => "*".into(),
             },
         )
+    }
+
+    fn check_mem(self) -> anyhow::Result<()> {
+        let name = self.cfg.as_ref().unwrap().name.clone();
+        executor::build_c(self, true, true, false)?;
+        let mut cmd = Command::new("valgrind");
+        cmd.arg("--leak-check=full");
+        cmd.arg("--show-leak-kinds=all");
+        cmd.arg(format!("./build/{}", name));
+        cmd.spawn()?.wait()?;
+        Ok(())
     }
 
     fn update(&self, forced: bool) -> anyhow::Result<()> {

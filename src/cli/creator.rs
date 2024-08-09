@@ -3,7 +3,11 @@
 /// the main.c file and the project.lua config.
 /// In addition to that there are also are helper
 /// functions for creating all directories and files
-use std::{fs::File, io::Write, path::{Path, PathBuf}};
+use std::{
+    fs::File,
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 use anyhow::Context;
 use git2::{Repository, RepositoryInitOptions};
@@ -23,15 +27,40 @@ int main(void) {
 }
 "#;
 
+const LIB_MAIN_FILE_LAYOUT: &str = r#"// Run debugging and testing code here. Not included in release build
+
+int main(void) {
+    printf("Hello, i am being debugged :)\n");
+}
+"#;
+
+const LIB_LIB_FILE_LAYOUT: &str = r#"// Example function implementations for the header
+
+#include <stdio.h>
+#include "../include/lib.h"
+
+void say_hello() {
+    printf("Hello!\n");
+}
+
+int square(int number) {
+    return number * number;
+}
+"#;
+
+const HEADER_FILE_LAYOUT: &str = r#"// Example functions you want to export through a header
+
+void say_hello();
+
+int square(int number);
+"#;
+
 const GITIGNORE_LAYOUT: &str = "build/\n";
 
 impl<'p> Project<'p> {
     pub fn new(root_dir: &'p PathBuf) -> Self {
         let name = root_dir.file_name().unwrap().to_string_lossy().to_string();
-        Self {
-            root_dir,
-            name,
-        }
+        Self { root_dir, name }
     }
 
     pub fn create(&self, is_lib: bool) -> anyhow::Result<()> {
@@ -52,6 +81,15 @@ impl<'p> Project<'p> {
 
         // Main file
         Self::create_main_file(self.root_dir, is_lib)?;
+
+        if is_lib {
+            // Include dir if necessary
+            self.create_dir("include")?;
+            // Example header if necessary
+            Self::create_header_file(self.root_dir)?;
+            Self::create_lib_file(self.root_dir)?;
+        }
+
         Ok(())
     }
 
@@ -62,7 +100,7 @@ impl<'p> Project<'p> {
 
     #[inline(always)]
     fn create_root_dir(&self) -> anyhow::Result<()> {
-        util::create_dir(&self.name).context(format!("Failed to create project: {}", self.name))
+        util::create_dir(&self.name)
     }
 
     fn create_git_repo(&self) -> anyhow::Result<()> {
@@ -72,7 +110,7 @@ impl<'p> Project<'p> {
 
         // Create the Git repository.
         Repository::init_opts(&self.name, &opts)
-            .context("Failed to create repo")
+            .context("Failed to create git repository")
             .map(|_| ())
     }
 
@@ -105,17 +143,40 @@ impl<'p> Project<'p> {
     }
 
     pub fn create_main_file(root_dir: &Path, is_lib: bool) -> anyhow::Result<()> {
-        let mut main_file = File::create(format!(
-            "{}/src/{}.c",
-            root_dir.display(),
-            if is_lib { "lib" } else { "main" }
-        ))
-        .context("Failed to create main file")?;
+        let mut main_file =
+            File::create(root_dir.join("src/main.c")).context("Failed to create main file")?;
 
         // write content to main file
         main_file
-            .write_all(MAIN_FILE_LAYOUT.as_bytes())
+            .write_all(
+                if is_lib {
+                    LIB_MAIN_FILE_LAYOUT
+                } else {
+                    MAIN_FILE_LAYOUT
+                }
+                .as_bytes(),
+            )
             .context("Failed to write example code to main.c file")
+    }
+
+    pub fn create_lib_file(root_dir: &Path) -> anyhow::Result<()> {
+        let mut lib_file =
+            File::create(root_dir.join("src/lib.c")).context("Failed to create lib file")?;
+
+        // write content to main file
+        lib_file
+            .write_all(LIB_LIB_FILE_LAYOUT.as_bytes())
+            .context("Failed to write example code to main.c file")
+    }
+
+    pub fn create_header_file(root_dir: &Path) -> anyhow::Result<()> {
+        let mut header_file =
+            File::create(root_dir.join("include/lib.h")).context("Failed to create header file")?;
+
+        // write content to main file
+        header_file
+            .write_all(HEADER_FILE_LAYOUT.as_bytes())
+            .context("Failed to write example code to header file")
     }
 
     pub fn create_cfg_file(root_dir: &Path, root_name: &str, lib: bool) -> anyhow::Result<()> {

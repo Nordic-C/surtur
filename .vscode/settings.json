@@ -1,7 +1,6 @@
 {
     "files.associations": {
-        "stdio.h": "c",
-        "stdbool.h": "c",
-        "string.h": "c"
+        "runner.h": "c",
+        "parser.h": "c"
     }
 }

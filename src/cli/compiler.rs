@@ -18,6 +18,9 @@ use super::{
     deps::DepManager,
 };
 
+// files to exclude when compiling a c lib by deafult
+pub const DEFAULT_LIB_EXCLUDE: &str = "main.c";
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub enum Standard {
     C89,
@@ -25,23 +28,28 @@ pub enum Standard {
     C11,
     C17,
     C2X,
+    C23,
     Gnu89,
     Gnu99,
     Gnu11,
     Gnu17,
     Gnu2X,
+    Gnu23,
 }
-pub const STANDARDS: [Standard; 10] = [
+
+pub const STANDARDS: [Standard; 12] = [
     Standard::C89,
     Standard::C99,
     Standard::C11,
     Standard::C17,
     Standard::C2X,
+    Standard::C23,
     Standard::Gnu89,
     Standard::Gnu99,
     Standard::Gnu11,
     Standard::Gnu17,
     Standard::Gnu2X,
+    Standard::Gnu23,
 ];
 
 impl Display for Standard {
@@ -52,11 +60,13 @@ impl Display for Standard {
             Standard::C11 => "c11",
             Standard::C17 => "c17",
             Standard::C2X => "c2x",
+            Standard::C23 => "c23",
             Standard::Gnu89 => "gnu89",
             Standard::Gnu99 => "gnu99",
             Standard::Gnu11 => "gnu11",
             Standard::Gnu17 => "gnu17",
             Standard::Gnu2X => "gnu2x",
+            Standard::Gnu23 => "gnu23",
         })
     }
 }
@@ -140,7 +150,7 @@ impl<'c> Compiler<'c> {
 
         program.arg(standard);
 
-        self.link_lib(&mut program)?;
+        self.link_lib(&mut program).context("Failed to link program to build executable")?;
 
         program
             .status()
@@ -151,7 +161,7 @@ impl<'c> Compiler<'c> {
     pub fn build_lib(&self, ctx: CompileCtx<'c>) -> anyhow::Result<()> {
         let standard = format!("-std={}", self.std);
         let mut src_files = util::get_src_files(&ctx.root_dir.join("src"));
-        src_files.remove(&ctx.root_dir.join("src").join("lib.c"));
+        src_files.remove(&ctx.root_dir.join("src").join(DEFAULT_LIB_EXCLUDE));
         src_files.retain(|e| !ctx.excluded.contains(e));
         let mut out_names = Vec::new();
 

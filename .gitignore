@@ -13,3 +13,6 @@ Cargo.lock
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
 .idea/*
+
+# local script for creating a new release and adding it to the path var
+new_r.sh
