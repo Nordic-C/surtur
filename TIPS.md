@@ -2,7 +2,7 @@
 
 This is for tips when using the cli
 
-## Wrong arg tips
+## Tips for using the wrong cli arg
 
 - `uninstall`
   - use `remove` instead
