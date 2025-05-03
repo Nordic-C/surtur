@@ -13,7 +13,7 @@ use mlua::{Lua, Table, Value};
 use crate::util::{files::FileHandler, DEFAULT_COMPILER};
 
 use super::{
-    compiler::{Standard, STANDARDS},
+    compiler::Standard,
     deps::{DepManager, Dependency},
     scripts::ScriptManager,
 };
@@ -21,20 +21,35 @@ use super::{
 // TODO: Seperate tables from rest of the struct so it represents the actual config file
 pub struct Config {
     pub name: String,
-    pub compiler: String,
-    pub c_std: Standard,
-    pub proj_version: String,
-    pub proj_type: ProjType,
+    pub props: Properties,
     pub deps: DepManager,
     pub entry: PathBuf,
     pub excluded: HashSet<PathBuf>,
     pub scripts: Option<ScriptManager>,
+    pub libraries: HashSet<String>,
+}
+
+pub struct Properties {
+    pub c_std: Standard,
+    pub proj_version: String,
+    pub proj_type: ProjType,
+    pub compiler: String,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum ProjType {
     Lib,
     Bin,
+}
+
+impl ProjType {
+    pub fn from_str(c_std: &str) -> Option<ProjType> {
+        match c_std {
+            "lib" => Some(ProjType::Lib),
+            "bin" => Some(ProjType::Bin),
+            _ => None,
+        }
+    }
 }
 
 impl Display for ProjType {
@@ -49,13 +64,8 @@ impl Display for ProjType {
 impl Config {
     pub fn parse(root_dir: &Path, file: FileHandler) -> anyhow::Result<Self> {
         let mut dependencies = HashSet::new();
-        let mut c_std_str = String::from("c17");
-        let mut proj_version = None;
-        let mut proj_type = ProjType::Lib;
-        let mut compiler = String::from(DEFAULT_COMPILER);
+        let mut libraries = HashSet::new();
         let mut excluded: HashSet<PathBuf> = HashSet::new();
-
-        let mut c_std: Option<Standard> = None;
 
         let lua = Lua::new();
         //let function = lua.create_function(builtins::run_script).expect("Failed to create function");
@@ -82,29 +92,26 @@ impl Config {
 
         let scripts_table: Option<Table> = lua.globals().get("Scripts").ok();
 
-        let entry: String = lua.globals().get("Entry").unwrap_or(
-            match proj_type {
-                ProjType::Lib => "lib.c",
-                ProjType::Bin => "main.c",
-            }
-            .into(),
-        );
+        let libraries_table: Option<Table> = lua.globals().get("Libraries").ok();
 
         let excluded_table: Option<Table> = lua.globals().get("Exclude").ok();
+
+        let mut props = Properties {
+            c_std: Standard::C23,
+            proj_version: String::new(),
+            proj_type: ProjType::Bin,
+            compiler: String::from(DEFAULT_COMPILER),
+        };
 
         for pair in props_table.pairs::<String, String>() {
             let (key, val) = pair.expect("Failed to get pair");
             match key.to_lowercase().as_str() {
-                "std" => c_std_str = val,
-                "version" => proj_version = Some(val),
-                "compiler" => compiler = val,
-                "type" => {
-                    proj_type = match val.as_str() {
-                        "lib" => ProjType::Lib,
-                        "bin" => ProjType::Bin,
-                        _ => bail!("`{}` is not a valid value for the projects type. Valid types are: `lib` and `bin`", val),
-                    }
-                }
+                "std" => props.c_std = Standard::from_str(&val)
+                    .context(format!("`{}` is not a valid value for the projects C Standard", val))?,
+                "version" => props.proj_version = val,
+                "compiler" => props.compiler = val,
+                "type" => props.proj_type = ProjType::from_str(&val)
+                    .context(format!("`{}` is not a valid value for the projects type. Valid types are: `lib` and `bin`", val))?,
                 key => bail!("invalid version entry: {}", key),
             }
         }
@@ -142,13 +149,13 @@ impl Config {
             }
         }
 
-        // version selection
-        for std in STANDARDS {
-            if c_std_str == std.to_string() {
-                c_std = Some(std);
-                break;
+        let entry: String = lua.globals().get("Entry").unwrap_or(
+            match props.proj_type {
+                ProjType::Lib => "lib.c",
+                ProjType::Bin => "main.c",
             }
-        }
+            .into(),
+        );
 
         let mut pre_scripts = Vec::new();
         let mut post_scripts = Vec::new();
@@ -179,19 +186,21 @@ impl Config {
             Some(ScriptManager::new(pre_scripts, post_scripts))
         };
 
+        if let Some(table) = libraries_table {
+            for lib in table.sequence_values::<String>() {
+                let lib = lib.context("Failed to get library")?;
+                libraries.insert(lib);
+            }
+        }
+
         Ok(Self {
             name,
-            compiler,
-            c_std: match c_std {
-                Some(std) => std,
-                None => bail!("Invalid C Standard: {:?}", c_std_str),
-            },
-            proj_version: proj_version.context("Failed to get project version")?,
+            props,
             deps: DepManager::new(dependencies),
-            proj_type,
             entry: entry.into(),
             excluded,
             scripts,
+            libraries,
         })
     }
 }

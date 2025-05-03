@@ -1,13 +1,6 @@
 /// Handling of commands, arguments.
 /// Also interacts with config module to
 /// gather/store configuration.
-pub mod compiler;
-pub mod config;
-pub mod creator;
-pub mod deps;
-pub mod executor;
-pub mod initiator;
-pub mod scripts;
 
 use std::{env, path::PathBuf, process::Command};
 
@@ -15,11 +8,8 @@ use anyhow::{bail, Context};
 use clap::{arg, command, value_parser, ArgMatches, Command as CCommand};
 
 use crate::{
-    subcommand,
-    util::{files::FileHandler, MISSING_CFG},
+    subcommand, tool::{config::Config, creator::Project, executor, initiator}, util::{files::FileHandler, MISSING_CFG}
 };
-
-use self::{config::Config, creator::Project};
 
 const INTRO: &str = r#"
 This is the Surtur build tool for C

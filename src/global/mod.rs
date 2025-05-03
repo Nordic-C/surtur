@@ -9,7 +9,7 @@ use anyhow::Context;
 use dirs::home_dir;
 use git2::Repository;
 
-use crate::cli::deps::Dependency;
+use crate::tool::deps::Dependency;
 
 pub const SURTUR_HOME: &str = "SURTUR_HOME";
 

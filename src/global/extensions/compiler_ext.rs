@@ -14,7 +14,7 @@ pub type CompilerCommand = String;
 pub struct CompilerExt {}
 
 impl<'f> Extension<'f, CompilerCommand, 2> for CompilerExt {
-    fn extension_name(&self) -> &str {
+    fn name(&self) -> &str {
         "compilers"
     }
 
@@ -27,7 +27,7 @@ impl<'f> Extension<'f, CompilerCommand, 2> for CompilerExt {
 
     fn load_global(&self) -> anyhow::Result<[CompilerCommand; 2]> {
         let home_path = PathBuf::from(env::var(SURTUR_HOME)?);
-        let path = home_path.join("extensions").join(self.extension_name());
+        let path = home_path.join("extensions").join(self.name());
         let files = fs::read_dir(path)?;
         for file in files {
             let lua = Lua::new();

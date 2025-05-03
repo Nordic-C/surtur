@@ -47,7 +47,7 @@ pub fn build_c(
     }
 
     if direct_execution {
-        cfg.proj_type = ProjType::Bin;
+        cfg.props.proj_type = ProjType::Bin;
     }
 
     let compiler = Compiler::new(&cli.cur_dir, &cfg)?;
@@ -58,7 +58,7 @@ pub fn build_c(
 
     let out_path = PathBuf::from("build");
 
-    if cfg.proj_type == ProjType::Lib {
+    if cfg.props.proj_type == ProjType::Lib {
         root_name.push_str(".a");
     }
 
@@ -88,7 +88,7 @@ pub fn build_c(
 
 pub fn run_test(cli: Cli, tests: &str) -> anyhow::Result<()> {
     let mut cfg = cli.cfg.context(MISSING_CFG)?;
-    cfg.proj_type = ProjType::Bin;
+    cfg.props.proj_type = ProjType::Bin;
     let compiler = Compiler::new(&cli.cur_dir, &cfg)?;
 
     let build_dir = PathBuf::from("build");

@@ -14,7 +14,7 @@ use anyhow::Context;
 use crate::util;
 
 use super::{
-    config::{Config, ProjType},
+    config::{Config, ProjType, Properties},
     deps::DepManager,
 };
 
@@ -37,20 +37,25 @@ pub enum Standard {
     Gnu23,
 }
 
-pub const STANDARDS: [Standard; 12] = [
-    Standard::C89,
-    Standard::C99,
-    Standard::C11,
-    Standard::C17,
-    Standard::C2X,
-    Standard::C23,
-    Standard::Gnu89,
-    Standard::Gnu99,
-    Standard::Gnu11,
-    Standard::Gnu17,
-    Standard::Gnu2X,
-    Standard::Gnu23,
-];
+impl Standard {
+    pub fn from_str(c_std: &str) -> Option<Standard> {
+        match c_std {
+            "c89" => Some(Standard::C89),
+            "c99" => Some(Standard::C99),
+            "c11" => Some(Standard::C11),
+            "c17" => Some(Standard::C17),
+            "c2x" => Some(Standard::C2X),
+            "c23" => Some(Standard::C23),
+            "gnu89" => Some(Standard::Gnu89),
+            "gnu99" => Some(Standard::Gnu99),
+            "gnu11" => Some(Standard::Gnu11),
+            "gnu17" => Some(Standard::Gnu17),
+            "gnu2x" => Some(Standard::Gnu2X),
+            "gnu23" => Some(Standard::Gnu23),
+            _ => None
+        }
+    }
+}
 
 impl Display for Standard {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -80,8 +85,8 @@ pub enum CompType {
 pub struct Compiler<'c> {
     cmd: &'c String,
     dm: &'c DepManager,
-    std: Standard,
-    proj_type: ProjType,
+    libs: &'c HashSet<String>,
+    props: &'c Properties,
     proj_dir: &'c PathBuf,
     pub root_name: &'c str,
 }
@@ -98,11 +103,11 @@ impl<'c> Compiler<'c> {
         let root_name =
             util::root_dir_name(cur_dir).context("Failed to get root name of project")?;
         Ok(Self {
-            cmd: &cfg.compiler,
+            cmd: &cfg.props.compiler,
             dm: &cfg.deps,
-            proj_type: cfg.proj_type,
-            std: cfg.c_std,
+            props: &cfg.props,
             proj_dir: cur_dir,
+            libs: &cfg.libraries,
             root_name,
         })
     }
@@ -115,7 +120,7 @@ impl<'c> Compiler<'c> {
         is_release: bool,
         tests: bool,
     ) -> anyhow::Result<()> {
-        match self.proj_type {
+        match self.props.proj_type {
             ProjType::Lib => self.build_lib(ctx),
             ProjType::Bin => self.build_exe(ctx, enable_dbg, is_release, tests),
         }
@@ -128,7 +133,7 @@ impl<'c> Compiler<'c> {
         is_release: bool,
         tests: bool,
     ) -> anyhow::Result<()> {
-        let standard = format!("-std={}", self.std);
+        let standard = format!("-std={}", self.props.c_std);
         let mut program = Command::new(self.cmd);
         let mut src_files = util::get_src_files(&ctx.root_dir.join("src"));
         src_files.retain(|e| !ctx.excluded.contains(e));
@@ -148,6 +153,8 @@ impl<'c> Compiler<'c> {
             program.arg("-DNOTESTS");
         }
 
+        println!("command: {:#?}", program.get_args());
+
         program.arg(standard);
 
         self.link_lib(&mut program).context("Failed to link program to build executable")?;
@@ -159,7 +166,7 @@ impl<'c> Compiler<'c> {
     }
 
     pub fn build_lib(&self, ctx: CompileCtx<'c>) -> anyhow::Result<()> {
-        let standard = format!("-std={}", self.std);
+        let standard = format!("-std={}", self.props.c_std);
         let mut src_files = util::get_src_files(&ctx.root_dir.join("src"));
         src_files.remove(&ctx.root_dir.join("src").join(DEFAULT_LIB_EXCLUDE));
         src_files.retain(|e| !ctx.excluded.contains(e));
@@ -204,8 +211,13 @@ impl<'c> Compiler<'c> {
         cmd.arg("-Lbuild/");
         for dep in &self.dm.deps {
             let name = dep.name()?;
-            cmd.arg(format!("-l:{}/{}.a", name, name));
+            cmd.arg(format!("-l:{name}/{name}.a"));
         }
+
+        for lib in self.libs {
+            cmd.arg(format!("-l{lib}"));
+        }
+
         Ok(())
     }
 
@@ -229,4 +241,5 @@ impl<'c> Compiler<'c> {
         }
         Ok(())
     }
+
 }

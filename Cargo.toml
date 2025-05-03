@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.84"
 clap = { version = "4.5.4", features = ["cargo"] }
-colored = "2.1.0"
-dirs = "5.0.1"
-git2 = "0.18.3"
-mlua = { version = "0.9.8", features = ["lua54", "vendored"]}
+colored = "3.0.0"
+dirs = "6.0.0"
+git2 = "0.20.0"
+mlua = { version = "0.10.3", features = ["lua54", "vendored", "send"]}

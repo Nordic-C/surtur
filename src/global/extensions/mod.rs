@@ -4,8 +4,8 @@ use mlua::FromLua;
 
 use crate::util::lua_utils::LuaFunctionInfo;
 
-pub trait Extension<'f, T: FromLua<'f>, const FUNCTIONS: usize> {
-    fn extension_name(&self) -> &str;
+pub trait Extension<'f, T: FromLua, const FUNCTIONS: usize> {
+    fn name(&self) -> &str;
 
     fn functions(&self) -> [LuaFunctionInfo; FUNCTIONS];
 
