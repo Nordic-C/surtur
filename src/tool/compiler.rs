@@ -153,7 +153,7 @@ impl<'c> Compiler<'c> {
             program.arg("-DNOTESTS");
         }
 
-        println!("command: {:#?}", program.get_args());
+        println!("command: {:#?} {:#?}", self.cmd, program.get_args());
 
         program.arg(standard);
 
