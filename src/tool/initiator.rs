@@ -10,7 +10,7 @@ use std::fs;
 
 use super::creator::Project;
 
-pub fn init_proj(proj: &Project) -> anyhow::Result<()> {
+pub fn init_proj(proj: Project) -> anyhow::Result<()> {
     let cfg_file = proj.root_dir.join("project.lua");
     let main_file = proj.root_dir.join("src").join("main.c");
     if fs::metadata(cfg_file).is_err() {

@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use mlua::Lua;
 
+#[derive(Debug, Clone)]
 pub struct ScriptManager {
     pre_scripts: Vec<PathBuf>,
     post_scripts: Vec<PathBuf>,

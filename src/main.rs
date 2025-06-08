@@ -3,9 +3,9 @@ pub mod global;
 pub mod tool;
 pub mod util;
 
-use cli::Cli;
+use cli::Project;
 
 fn main() -> anyhow::Result<()> {
     global::init_dir()?;
-    Cli::new()?.exec()
+    Project::try_open()?.exec()
 }

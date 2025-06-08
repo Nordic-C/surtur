@@ -1,14 +1,14 @@
 /// Handling of commands, arguments.
 /// Also interacts with config module to
 /// gather/store configuration.
-
 use std::{env, path::PathBuf, process::Command};
 
-use anyhow::{bail, Context};
-use clap::{arg, command, value_parser, ArgMatches, Command as CCommand};
+use anyhow::Context;
+use clap::{Parser, Subcommand};
 
 use crate::{
-    subcommand, tool::{config::Config, creator::Project, executor, initiator}, util::{files::FileHandler, MISSING_CFG}
+    tool::{config::Config, creator, executor, initiator},
+    util::{files::FileHandler, MISSING_CFG},
 };
 
 const INTRO: &str = r#"
@@ -24,13 +24,97 @@ The most important commands are:
 - init // initialize a surtur C project
 "#;
 
+#[derive(Parser, Debug)]
+#[command(name = "surtur", version, about = "Tge bzukd systen fir c")]
 pub struct Cli {
+    #[command(subcommand)]
+    pub command: Commands,
+}
+
+pub struct Project {
     pub cfg: Option<Config>,
     pub cur_dir: PathBuf,
 }
 
-impl Cli {
-    pub fn new() -> anyhow::Result<Self> {
+#[derive(Subcommand, Debug)]
+pub enum Commands {
+    /// Run the current binary project
+    #[command(alias = "r")]
+    Run {
+        /// Enable debug mode for this project
+        #[arg(short, long)]
+        debug: bool,
+
+        /// Arguments passed to the program
+        #[arg(value_name = "PROGRAM_ARGS", trailing_var_arg = true)]
+        program_args: Vec<String>,
+    },
+
+    /// Initialize a surtur project in the current directory
+    Init,
+
+    /// Build the project into a library or executable
+    #[command(alias = "b")]
+    Build {
+        /// Compile in release mode
+        #[arg(short, long)]
+        release: bool,
+
+        /// Compile in debug mode
+        #[arg(short, long)]
+        debug: bool,
+
+        // Hardcoded windows targetting
+        #[arg(long)]
+        win: bool,
+    },
+
+    /// Run a specific or all tests
+    Test {
+        /// Specify a test name
+        #[arg(value_name = "NAME")]
+        name: Option<String>,
+    },
+
+    /// Create a new project
+    Add {
+        /// Name for the project
+        #[arg(value_name = "NAME")]
+        name: String,
+    },
+
+    /// Remove a dependency
+    Remove {
+        /// Dependency to remove
+        #[arg(value_name = "DEPENDENCY")]
+        dependency: String,
+    },
+
+    /// Create a new project
+    #[command(alias = "n")]
+    New {
+        /// Name for the project
+        #[arg(value_name = "NAME")]
+        name: String,
+
+        /// Mark the project as a library
+        #[arg(short, long)]
+        lib: bool,
+    },
+
+    /// Update or install dependencies
+    Update {
+        /// Force update dependencies even if up to date
+        #[arg(short, long)]
+        force: bool,
+    },
+
+    /// Check for memory leaks using valgrind
+    MemCheck,
+}
+
+impl Project {
+    pub fn try_open() -> anyhow::Result<Self> {
         let cur_dir = env::current_dir()?;
 
         let path = cur_dir.join("project.lua");
@@ -49,121 +133,35 @@ impl Cli {
 
     #[inline]
     pub fn exec(self) -> anyhow::Result<()> {
-        self.match_args()
-    }
-
-    fn match_args(self) -> anyhow::Result<()> {
-        match Self::handle_cmd() {
-            m if m.subcommand_matches("run").is_some() => {
-                let matches = m.subcommand_matches("run").unwrap();
-
-                let args: Option<Vec<&String>> =
-                    matches.get_many("PROGRAM_ARGS").map(|many| many.collect());
-
-                executor::run_c(self, true, args)?
+        let cli = Cli::parse();
+        match cli.command {
+            Commands::Run {
+                debug: _,
+                program_args,
+            } => executor::run_c(self, true, program_args),
+            Commands::Build { release, debug , win} => executor::build_c(self, debug, false, release, win)
+                .context("Failed to build program as executable"),
+            Commands::Init => initiator::init_proj(creator::Project::new(&self.cur_dir)),
+            Commands::Test { name } => executor::run_test(
+                self,
+                &match name {
+                    Some(tests) => tests,
+                    None => "*".into(),
+                },
+            ),
+            Commands::Update { force } => self.cfg.as_ref().context(MISSING_CFG)?.deps.download_deps(force),
+            Commands::MemCheck => self.check_mem(),
+            Commands::New { name, lib } => creator::Project::new(&PathBuf::from(name)).create(lib),
+            _ => {
+                println!("{INTRO}");
+                Ok(())
             }
-            m if m.subcommand_matches("build").is_some() => {
-                let matches = m.subcommand_matches("build").unwrap();
-
-                let enable_dbg = matches.get_flag("debug");
-                let is_release = matches.get_flag("release");
-
-                executor::build_c(self, enable_dbg, false, is_release)
-                    .context("Failed to build program as executable")?;
-            }
-            m if m.subcommand_matches("init").is_some() => {
-                initiator::init_proj(&Project::new(&self.cur_dir))?;
-            }
-            m if m.subcommand_matches("test").is_some() => self.run_test(m)?,
-            m if m.subcommand_matches("update").is_some() => {
-                self.update(m.subcommand_matches("update").unwrap().get_flag("force"))?
-            }
-            m if m.subcommand_matches("mem-check").is_some() => self.check_mem()?,
-            // Switch this to if let guards once they are stabelized
-            m if m.subcommand_matches("new").is_some() => Self::new_proj(m)?,
-            _ => println!("{}", INTRO),
         }
-        Ok(())
-    }
-
-    fn handle_cmd() -> ArgMatches {
-        command!()
-            .subcommand(
-                CCommand::new("run")
-                .about("Run the current binary project")
-                .arg(
-                    arg!(-d --debug "Enable debug mode for this project")
-                        .required(false)
-                )
-                .arg(
-                    arg!(<PROGRAM_ARGS> ... "Args")
-                        .required(false)
-                )
-            )
-            .subcommand(
-                CCommand::new("init")
-                .about("Initialize a surtur project in the current directory")
-            )
-            .subcommand(
-                CCommand::new("build")
-                    .about("Build the project into a library or executable")
-                    .arg(
-                        arg!(-r --release "Compile the program in release mode (better optimization)")
-                            .required(false),
-                    )
-                    .arg(
-                        arg!(-d --debug "Compile the program in debug mode (more advanced debugging capabilities)")
-                            .required(false),
-                    ),
-            )
-            .subcommand(
-                subcommand!("test", "Run a specific or all tests",
-                arg!(<NAME> "Specify a test name").required(false))
-            )
-            .subcommand(subcommand!(
-                "add",
-                "Create a new project",
-                arg!(<NAME> "Name for the project")
-            ))
-            .subcommand(subcommand!(
-                "remove",
-                "remove a dependency",
-                arg!(<DEPENDENCY> "dependency to remove")
-            ))
-            .subcommand(subcommand!(
-                "new",
-                "create a new project",
-                arg!(<NAME> "name for the project")
-            ).arg(arg!(-l --lib "Mark the project as a library")))
-            .subcommand(CCommand::new("update")
-                .about("Update or install dependecies")
-                .arg(
-                    arg!(-f --force "Force update dependencies, even if there is no new version")
-                        .required(false))
-            )
-            .subcommand(CCommand::new("mem-check")
-                .about("Check your program for memory leaks using valgrind")
-            )
-            .get_matches()
-    }
-
-    fn run_test(self, m: ArgMatches) -> anyhow::Result<()> {
-        let cmd = m
-            .subcommand_matches("test")
-            .context("Failed to match subcommand `test`")?;
-        let tests = cmd.get_one::<PathBuf>("NAME");
-        executor::run_test(
-            self,
-            &match tests {
-                Some(tests) => tests.to_string_lossy().to_string(),
-                None => "*".into(),
-            },
-        )
     }
 
     fn check_mem(self) -> anyhow::Result<()> {
         let name = self.cfg.as_ref().unwrap().name.clone();
-        executor::build_c(self, true, true, false)?;
+        executor::build_c(self, true, true, false, false)?;
         let mut cmd = Command::new("valgrind");
         cmd.arg("--leak-check=full");
         cmd.arg("--show-leak-kinds=all");
@@ -171,21 +169,5 @@ impl Cli {
         cmd.spawn()?.wait()?;
         Ok(())
     }
-
-    fn update(&self, forced: bool) -> anyhow::Result<()> {
-        let dep_manager = &self.cfg.as_ref().context(MISSING_CFG)?.deps;
-        dep_manager.download_deps(forced)
-    }
-
-    fn new_proj(m: ArgMatches) -> anyhow::Result<()> {
-        let cmd = m.subcommand_matches("new").unwrap();
-        // Unwrap is safe because of .is_some() check
-        let name = cmd.get_one::<PathBuf>("NAME");
-        let is_lib = cmd.get_flag("lib");
-
-        match name {
-            Some(name) => Project::new(name).create(is_lib),
-            None => bail!("Failed to create project because of issues with the NAME argument"),
-        }
-    }
+    
 }

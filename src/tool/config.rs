@@ -19,6 +19,7 @@ use super::{
 };
 
 // TODO: Seperate tables from rest of the struct so it represents the actual config file
+#[derive(Debug, Clone)]
 pub struct Config {
     pub name: String,
     pub props: Properties,
@@ -26,9 +27,12 @@ pub struct Config {
     pub entry: PathBuf,
     pub excluded: HashSet<PathBuf>,
     pub scripts: Option<ScriptManager>,
-    pub libraries: HashSet<String>,
+    pub libraries: Vec<String>,
+    pub win_libraries: Vec<String>,
+    pub compiler_params: Vec<String>,
 }
 
+#[derive(Debug, Clone)]
 pub struct Properties {
     pub c_std: Standard,
     pub proj_version: String,
@@ -64,8 +68,10 @@ impl Display for ProjType {
 impl Config {
     pub fn parse(root_dir: &Path, file: FileHandler) -> anyhow::Result<Self> {
         let mut dependencies = HashSet::new();
-        let mut libraries = HashSet::new();
+        let mut libraries = Vec::new();
+        let mut win_libraries = Vec::new();
         let mut excluded: HashSet<PathBuf> = HashSet::new();
+        let mut compiler_params = Vec::new();
 
         let lua = Lua::new();
         //let function = lua.create_function(builtins::run_script).expect("Failed to create function");
@@ -94,7 +100,11 @@ impl Config {
 
         let libraries_table: Option<Table> = lua.globals().get("Libraries").ok();
 
+        let win_libraries_table: Option<Table> = lua.globals().get("WinLibraries").ok();
+
         let excluded_table: Option<Table> = lua.globals().get("Exclude").ok();
+
+        let params_table: Option<Table> = lua.globals().get("Params").ok();
 
         let mut props = Properties {
             c_std: Standard::C23,
@@ -189,7 +199,21 @@ impl Config {
         if let Some(table) = libraries_table {
             for lib in table.sequence_values::<String>() {
                 let lib = lib.context("Failed to get library")?;
-                libraries.insert(lib);
+                libraries.push(lib);
+            }
+        }
+
+        if let Some(table) = win_libraries_table {
+            for lib in table.sequence_values::<String>() {
+                let lib = lib.context("Failed to get win library")?;
+                win_libraries.push(lib);
+            }
+        }
+
+        if let Some(table) = params_table {
+            for param in table.sequence_values::<String>() {
+                let param = param.context("Failed to get compiler parameter")?;
+                compiler_params.push(param);
             }
         }
 
@@ -201,6 +225,8 @@ impl Config {
             excluded,
             scripts,
             libraries,
+            win_libraries,
+            compiler_params,
         })
     }
 }

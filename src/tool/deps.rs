@@ -16,12 +16,12 @@ use crate::{global, util::files::FileHandler};
 
 use super::config::Config;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct DepManager {
     pub deps: HashSet<Dependency>,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Dependency {
     pub _version: String,
     pub origin: String,

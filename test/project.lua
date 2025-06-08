@@ -4,7 +4,7 @@ Props = {
     std = "c17",
     version = "0.1",
     type = "bin",
-    compiler = "x86_64-w64-mingw32-gcc",
+    compiler = "gcc" --"x86_64-w64-mingw32-gcc",
 }
 
 -- external dependenciess
@@ -25,4 +25,15 @@ Libraries = {
     "dl",
     "rt",
     "X11",
+}
+
+WinLibraries = {
+    "winraylib",
+    "opengl32",
+    "gdi32",
+    "winmm",
+}
+
+Params = {
+    -- "--deez"
 }

@@ -52,7 +52,7 @@ impl Standard {
             "gnu17" => Some(Standard::Gnu17),
             "gnu2x" => Some(Standard::Gnu2X),
             "gnu23" => Some(Standard::Gnu23),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -85,7 +85,9 @@ pub enum CompType {
 pub struct Compiler<'c> {
     cmd: &'c String,
     dm: &'c DepManager,
-    libs: &'c HashSet<String>,
+    libs: &'c Vec<String>,
+    win_libs: &'c Vec<String>,
+    extra_compiler_params: &'c Vec<String>,
     props: &'c Properties,
     proj_dir: &'c PathBuf,
     pub root_name: &'c str,
@@ -108,6 +110,8 @@ impl<'c> Compiler<'c> {
             props: &cfg.props,
             proj_dir: cur_dir,
             libs: &cfg.libraries,
+            win_libs: &cfg.win_libraries,
+            extra_compiler_params: &cfg.compiler_params,
             root_name,
         })
     }
@@ -119,10 +123,11 @@ impl<'c> Compiler<'c> {
         enable_dbg: bool,
         is_release: bool,
         tests: bool,
+        win: bool,
     ) -> anyhow::Result<()> {
         match self.props.proj_type {
             ProjType::Lib => self.build_lib(ctx),
-            ProjType::Bin => self.build_exe(ctx, enable_dbg, is_release, tests),
+            ProjType::Bin => self.build_exe(ctx, enable_dbg, is_release, tests, win),
         }
     }
 
@@ -132,6 +137,7 @@ impl<'c> Compiler<'c> {
         enable_dbg: bool,
         is_release: bool,
         tests: bool,
+        win: bool,
     ) -> anyhow::Result<()> {
         let standard = format!("-std={}", self.props.c_std);
         let mut program = Command::new(self.cmd);
@@ -147,17 +153,31 @@ impl<'c> Compiler<'c> {
         program
             .args(src_files)
             .arg("-o")
-            .arg(ctx.out_dir.join(ctx.out_name));
+            .arg(
+                ctx.out_dir
+                    .join(format!("{}{}", ctx.out_name, if win { ".exe" } else { "" })),
+            );
 
         if !tests {
             program.arg("-DNOTESTS");
         }
 
-        println!("command: {:#?} {:#?}", self.cmd, program.get_args());
+        if win {
+            program.arg("-DSURTUR_BUILD_WIN");
+        }
+
+        if enable_dbg {
+            program.arg("-DSURTUR_DEBUG");
+        }
 
         program.arg(standard);
 
-        self.link_lib(&mut program).context("Failed to link program to build executable")?;
+        program.args(self.extra_compiler_params);
+
+        self.link_lib(&mut program, win)
+            .context("Failed to link program to build executable")?;
+
+        println!("command: {:#?} {:#?}", self.cmd, program.get_args());
 
         program
             .status()
@@ -207,15 +227,25 @@ impl<'c> Compiler<'c> {
         Ok(())
     }
 
-    pub fn link_lib(&self, cmd: &mut Command) -> anyhow::Result<()> {
-        cmd.arg("-Lbuild/");
+    pub fn link_lib(&self, cmd: &mut Command, win: bool) -> anyhow::Result<()> {
+        if !win {
+            cmd.arg("-Lbuild/");
+        } else {
+            cmd.arg("-L/usr/x86_64-w64-mingw32/lib");
+        }
         for dep in &self.dm.deps {
             let name = dep.name()?;
             cmd.arg(format!("-l:{name}/{name}.a"));
         }
 
-        for lib in self.libs {
-            cmd.arg(format!("-l{lib}"));
+        if win {
+            for lib in self.win_libs {
+                cmd.arg(format!("-l{lib}"));
+            }
+        } else {
+            for lib in self.libs {
+                cmd.arg(format!("-l{lib}"));
+            }
         }
 
         Ok(())
@@ -241,5 +271,4 @@ impl<'c> Compiler<'c> {
         }
         Ok(())
     }
-
 }
